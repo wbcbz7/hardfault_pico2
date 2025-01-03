@@ -93,16 +93,6 @@ int main(void) {
         blink_led_hang();
     } else printf("core 1 ping success\n");
 
-#if 1
-    // clear framebuffers
-    {   
-        uint16_t *p = fb[0];
-        for (int y = 0; y < Y_RES; y++) for (int x = 0; x < X_RES; x++) *p++ = (x ^ y);
-        p = fb[1];
-        for (int y = 0; y < Y_RES; y++) for (int x = 0; x < X_RES; x++) *p++ = ((x & 31) << 0) | ((y & 31) << 5) | (((x ^ y) & 31) << 10);
-    }
-#endif
-
     // start video
     queue_post_msg(CORE1_MSG_START_VIDEO, 0);
     if ((resp = queue_get_resp(0)) != 0) {
@@ -112,8 +102,11 @@ int main(void) {
 
     fbIdx = 0;
     while(1) {
-        dvi_wait_for_vblank();
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
+        dvi_wait_for_vblank();
+
+        memset(&fb[fbIdx], 0, X_RES*Y_RES*BYTES_PER_PIXEL);
+
         float t = time_us_32() / 1000000.0f;
         for (int i = 0; i < 20; i++) {
             int x = (X_RES/2-1)*sin(t*0.5 + i*0.3)+(X_RES/2);
