@@ -20,6 +20,9 @@
 #include "defs.h"
 #include "core1.h"
 
+// parts include
+#include "parts/linetunnel.h"
+
 // LED blinker in case of errors
 void blink_led_hang() {
     while(1) {
@@ -107,18 +110,5 @@ int main(void) {
         blink_led_hang();
     }
 
-    fbIdx = 0;
-    while(1) {
-        dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
-        dvi_wait_for_vblank();
-
-        memset(&fb[fbIdx], 0, X_RES*Y_RES*BYTES_PER_PIXEL);
-
-        float t = time_us_32() / 1000000.0f;
-        for (int i = 0; i < 20; i++) {
-            int x = (X_RES/2-1)*sin(t*0.5 + i*0.3)+(X_RES/2);
-            int y = (Y_RES/2-1)*cos(t*0.6 + i*0.3)+(Y_RES/2);
-            fb[fbIdx][y*X_RES+x] = 0x7FFF;
-        }
-    }
+    linetunnel_run();
 }

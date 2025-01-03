@@ -43,14 +43,21 @@ add_executable(dh2025w_demo
         dvi.c
         lxmplay.cpp
 	core1.cpp
-        )
+
+	misc/fbstuff.cpp
+
+        parts/linetunnel.cpp
+)
 
 pico_generate_pio_header(dh2025w_demo ${CMAKE_CURRENT_LIST_DIR}/dvi.pio)
 pico_generate_pio_header(dh2025w_demo ${CMAKE_CURRENT_LIST_DIR}/i2s.pio)
 
-target_include_directories(dh2025w_demo PRIVATE
+target_include_directories(dh2025w_demo PUBLIC
+        ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/images
-        )
+	${CMAKE_CURRENT_LIST_DIR}/parts
+	${CMAKE_CURRENT_LIST_DIR}/misc
+)
 
 pico_enable_stdio_uart(dh2025w_demo 1)
 pico_enable_stdio_usb(dh2025w_demo 0)

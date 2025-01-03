@@ -19,3 +19,20 @@
 // board define (TODO: do this via CMake)
 #define HSTX_OUT_MURMULATOR2
 //#define HSTX_OUT_PICODVISOCK
+
+#ifdef PICO_BUILD
+#include "pico.h"
+#define __unroll __attribute__((optimize("unroll-loops")))
+#else
+#define __not_in_flash_func(x) x
+#define __scratch_x(x) 
+#define __scratch_y(x) 
+#define __unroll 
+#endif
+
+// -------------------------
+// SHARED RESOURCES (WARNING: source of potential bugs :D)
+
+// frame buffer
+extern uint16_t fb[2][X_RES * Y_RES];
+extern uint8_t  fbIdx;

@@ -34,9 +34,3 @@ enum {
     CORE1_RESP_TIMEOUT = -1
 };
 
-// -------------------------
-// SHARED RESOURCES (WARNING: source of potential bugs :D)
-
-// frame buffer
-extern uint16_t fb[2][X_RES * Y_RES];
-extern uint8_t  fbIdx;

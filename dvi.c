@@ -592,7 +592,7 @@ static void __not_in_flash_func(dvi_state_advance)(struct dvi_hstx_context_t* ct
     }
 }
 
-static void __not_in_flash_func(dvi_fill_command_list)() {
+static void __scratch_y("")(dvi_fill_command_list)() {
     struct dvi_hstx_context_t* ctx = &v_ctx;
     struct dvi_dma_command_list_t *cmdlist = dvi_command_list + v_ctx.irq_sm.cmdlist_offset;
     for (int i = 0; i < COMMAND_LIST_SIZE; i++) {
@@ -602,7 +602,7 @@ static void __not_in_flash_func(dvi_fill_command_list)() {
 }
 
 // DMA IRQ handler
-void __scratch_x("")(dvi_dma_irq_handler)() {
+void __scratch_y("")(dvi_dma_irq_handler)() {
 #if 0
     // first test if bus error is encountered
     if ((v_ctx.dma.chain[0].hw->ctrl_trig | v_ctx.dma.chain[1].hw->ctrl_trig) & DMA_CH0_CTRL_TRIG_AHB_ERROR_BITS) {

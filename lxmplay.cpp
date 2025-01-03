@@ -1,4 +1,11 @@
-﻿#define _CRT_SECURE_NO_WARNINGS
+﻿#ifdef PICO_BUILD
+#include "pico.h"
+#else
+#define __not_in_flash_func(x) x
+#define __scratch_y(x) 
+#endif
+
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -448,7 +455,7 @@ int lxm_tick(lxm_context_t* ctx) {
 // render engine
 
 template <typename T>
-static void lxm_render_channel(lxm_context_t* ctx, int ch, int16_t* buf, int32_t samples) {
+static void __not_in_flash_func(lxm_render_channel)(lxm_context_t* ctx, int ch, int16_t* buf, int32_t samples) {
     auto& chan    = ctx->channels[ch];
     auto  smpctx  = chan.sample;
     const T* smp  = (const T*)chan.sample->data8;
@@ -522,7 +529,7 @@ static void lxm_render_channel(lxm_context_t* ctx, int ch, int16_t* buf, int32_t
     } while (--samples);
 }
 
-static void lxm_render_frame(lxm_context_t* ctx, int16_t* buf, int32_t samples) {
+static void __not_in_flash_func(lxm_render_frame)(lxm_context_t* ctx, int16_t* buf, int32_t samples) {
     if (samples == 0) return;;
 
     for (int ch = 0; ch < ctx->header.num_channels; ch++) {
@@ -541,10 +548,12 @@ static void lxm_render_frame(lxm_context_t* ctx, int16_t* buf, int32_t samples) 
     }
 }
 
+#ifndef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 // returns sample frames rendered or 0 if none or error
-int lxm_render(lxm_context_t* ctx, int16_t* buf, int32_t count) {
+int __not_in_flash_func(lxm_render)(lxm_context_t* ctx, int16_t* buf, int32_t count) {
     if ((buf == nullptr) || (count == 0)) return 1;
 
     // prepare buffer

@@ -102,6 +102,7 @@ static __attribute__((aligned(AUDIO_BUFFER_SIZE_BYTES))) int16_t audiobuf[AUDIO_
 volatile int irq_count = 0, callback_irq_count = 0;
 volatile uint32_t audio_buffer_offset;
 volatile uint32_t audio_buffer_timestamp;
+volatile bool audio_in_callback = false;
 int audio_dma_channel;
 int audio_dma_irq       = DMA_IRQ_3;
 int audio_callback_irq  = FIRST_USER_IRQ;
@@ -127,7 +128,12 @@ void __not_in_flash_func(audio_render)(int16_t *dst, uint32_t frames, uint32_t t
 
 // audio callback interrupt, called with lower priority
 void __not_in_flash_func(audio_callback_handler)() {
-    audio_render(audiobuf + audio_buffer_offset, AUDIO_BUFFER_SIZE/2, audio_buffer_timestamp);
+    // prevent reentrancy issues
+    if (audio_in_callback == false) {
+        audio_in_callback == true;
+        audio_render(audiobuf + audio_buffer_offset, AUDIO_BUFFER_SIZE/2, audio_buffer_timestamp);
+        audio_in_callback == false;
+    }
     callback_irq_count++;
     irq_clear(audio_callback_irq);
 }
@@ -209,7 +215,7 @@ int video_init() {
 }
 
 int audio_init() {
-     // init audio output
+    // init audio output
     // init LXM player
     if (lxm_init(&lxm_ctx, 2, SAMPLE_RATE) != 0) {
         printf("error: unable to init lxm!\n");
@@ -226,6 +232,7 @@ int audio_init() {
     audio_render(audiobuf + (AUDIO_BUFFER_SIZE/2)*2, AUDIO_BUFFER_SIZE/2, AUDIO_BUFFER_SIZE/2);
     audio_buffer_offset    = (AUDIO_BUFFER_SIZE/2)*2;
     audio_buffer_timestamp = (AUDIO_BUFFER_SIZE/2);
+    audio_in_callback      = false;
 
     // init I2S PIO
     PIO i2s_pio;
@@ -257,6 +264,7 @@ int audio_init() {
     dma_irqn_set_channel_enabled(audio_dma_irq - DMA_IRQ_0, audio_dma_channel, true);
     irq_add_shared_handler(audio_dma_irq, audio_dma_interrupt_handler, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
     irq_set_exclusive_handler(audio_callback_irq, audio_callback_handler);
+    irq_set_priority(audio_dma_irq,      PICO_DEFAULT_IRQ_PRIORITY + 0x10); // allow DVI DMA IRQ preempt audio DMA IRQ
     irq_set_priority(audio_callback_irq, PICO_LOWEST_IRQ_PRIORITY);
     irq_set_enabled(audio_dma_irq, true);
     irq_set_enabled(audio_callback_irq, true);
@@ -275,7 +283,7 @@ int audio_init() {
 
 // ------------------------------------------
 // core 1 task
-void core1_task() {
+void __scratch_y("") core1_task() {
     printf("core 1 started...\n");
 
     while (1) {
