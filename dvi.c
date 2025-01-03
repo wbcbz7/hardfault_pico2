@@ -811,7 +811,7 @@ void __not_in_flash_func(dvi_wait_for_vblank)() {
     while (dvi_get_current_state() != DVI_STATE_IDLE && dvi_get_current_state() != DVI_STATE_FRONT_PORCH) tight_loop_contents();
 }
 
-// block until hblank
+// block until hblank (afaik broken now)
 void __not_in_flash_func(dvi_wait_for_hblank()) {
     while (dvi_get_current_state() != DVI_STATE_IDLE && dvi_get_current_state() == DVI_STATE_ACTIVE_BLANK) tight_loop_contents();
     while (dvi_get_current_state() != DVI_STATE_IDLE && dvi_get_current_state() != DVI_STATE_ACTIVE_BLANK) tight_loop_contents();

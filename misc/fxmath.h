@@ -1,5 +1,4 @@
-#ifndef __FXMATH_H
-#define __FXMATH_H
+#pragma once
 
 #include <stdlib.h>
 #include <math.h>
@@ -39,92 +38,25 @@ inline long ceilx(long a) {return (a + 0xFFFF) >> 16;}
 inline long ceilx16(long a) {return (a + 0xFFFF) & ~0xFFFF;}
 inline long sfract16(long a) {return (a - (a & ~0xFFFF));}       // signed fract16()
 
-long imul16(long x, long y);        // (x * y) >> 16
-#pragma aux imul16 = \
-    " imul  edx        "\
-    " shrd  eax,edx,16 "\
-    parm [eax] [edx] value [eax]
+inline long imul16(long x, long y) {return (long)(((int64_t)x * y) >> 16);}        // (x * y) >> 16
 
-long imul8(long x, long y);        // (x * y) >> 8
-#pragma aux imul8 = \
-    " imul  edx        "\
-    " shrd  eax,edx,8 "\
-    parm [eax] [edx] value [eax]
+inline long imul8(long x, long y) {return (long)(((int64_t)x * y) >> 8);}          // (x * y) >> 8
 
+inline long imul14(long x, long y) {return (long)(((int64_t)x * y) >> 14);}        // (x * y) >> 14
 
-long imul14(long x, long y);        // (x * y) >> 14
-#pragma aux imul14 = \
-    " imul  edx        "\
-    " shrd  eax,edx,14 "\
-    parm [eax] [edx] value [eax]
+inline long idiv16(long x, long y) {return (long)(((int64_t)x << 16) / y);}        // (x << 16) / y
 
+inline long idiv8(long x, long y) {return (long)(((int64_t)x << 8) / y);}          // (x << 8) / y
 
-long idiv16(long x, long y);        // (x << 16) / y
-#pragma aux idiv16 = \
-    " mov   edx,eax    "\
-    " sar   edx,16     "\
-    " shl   eax,16     "\
-    " idiv  ebx        "\
-    parm [eax] [ebx] modify exact [eax edx] value [eax]
+inline long imuldiv(long x, long y, long z) {return (long)(((int64_t)x * y) / z);} // (x * y) / z, 64 bit precision
 
-long idiv8(long x, long y);        // (x << 8) / y
-#pragma aux idiv8 = \
-    " mov   edx,eax    "\
-    " sar   edx,24     "\
-    " shl   eax,8      "\
-    " idiv  ebx        "\
-    parm [eax] [ebx] modify exact [eax edx] value [eax]
-
-long imuldiv(long x, long y, long z);   // (x * y) / z, 64 bit precision
-#pragma aux imuldiv = \
-    " imul  ebx "     \
-    " idiv  ecx "     \
-    parm [eax] [ebx] [ecx] modify exact [eax edx] value [eax]
-    
 // *dst = (long) src;
-void fist(long * dst, double src);
-#pragma aux fist = \
-    "   fistp  dword ptr [eax]  "\
-    parm [eax] [8087] modify [8087]
-   
-extern "C" {
-    // float->int FADD trickery
-    extern volatile long long _fadd_temp[4];
-    extern const float     _fadd_magic_32_0;
-    extern const float     _fadd_magic_16_16;
-    extern const float     _fadd_magic_24_8;
-    extern const float     _fadd_magic_8_24;
-}
+inline void fist(long * dst, double src) { *dst = (long)src; }
 
-long fistf(double src);
-#pragma aux fistf = \
-    " fadd  dword ptr [_fadd_magic_32_0] " \
-    " fstp  qword ptr [_fadd_temp] " \
-    " mov   eax, dword ptr [_fadd_temp] " \
-    parm [8087] value [eax] modify [8087]
+inline long fistf(double src) { return (long)(src); }
     
-long fistfx(double src);
-#pragma aux fistfx = \
-    " fadd  dword ptr [_fadd_magic_16_16] " \
-    " fstp  qword ptr [_fadd_temp] " \
-    " mov   eax, dword ptr [_fadd_temp] " \
-    parm [8087] value [eax] modify [8087]
+inline long fistfx(double src) { return (long)(src * 65536.0f); }
     
-long fistfx8(double src);
-#pragma aux fistfx8 = \
-    " fadd  dword ptr [_fadd_magic_24_8] " \
-    " fstp  qword ptr [_fadd_temp] " \
-    " mov   eax, dword ptr [_fadd_temp] " \
-    parm [8087] value [eax] modify [8087]
-    
-long fistfxtex(double src);
-#pragma aux fistfxtex = \
-    " fadd  dword ptr [_fadd_magic_8_24] " \
-    " fstp  qword ptr [_fadd_temp] " \
-    " mov   eax, dword ptr [_fadd_temp] " \
-    parm [8087] value [eax] modify [8087]
-   
+inline long fistfx8(double src) { return (long)(src * 65536.0f * 256.0f); }
 
-
-#endif   
-    
+inline long fistfxtex(double src) { return (long)(src * 256.0f); }

@@ -103,12 +103,14 @@ int main(void) {
         blink_led_hang();
     }
 
+#if 0
     // start audio
     queue_post_msg(CORE1_MSG_START_MUSIC, 0);
     if ((resp = queue_get_resp(0)) != 0) {
         printf("unable to start audio: resp = %d\n", resp);
         blink_led_hang();
     }
+#endif
 
     linetunnel_run();
 }
