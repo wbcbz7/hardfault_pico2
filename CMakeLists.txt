@@ -48,7 +48,8 @@ add_executable(dh2025w_demo
         misc/linedraw.cpp
         misc/2dclip.cpp
         misc/mytmap.cpp
-
+        
+        parts/test3d.cpp
         parts/linetunnel.cpp
 )
 

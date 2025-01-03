@@ -22,6 +22,7 @@
 
 // parts include
 #include "parts/linetunnel.h"
+#include "parts/test3d.h"
 
 // LED blinker in case of errors
 void blink_led_hang() {
@@ -111,6 +112,12 @@ int main(void) {
         blink_led_hang();
     }
 #endif
-
+    
+#if 1
+    test3d_init();
+    test3d_run();
+#endif
+#if 0
     linetunnel_run();
+#endif
 }
