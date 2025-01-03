@@ -10,6 +10,7 @@
 #include <matrix.h>
 #include <incobj.h>
 #include <string.h>
+#include <palerp.h>
 
 #include "../objects/duck3ds.h"
 
@@ -34,11 +35,27 @@ static face_sort_t *facesort;//[MAX_FACES];
 // transformed vertices storage
 static vec3f *vt;//[MAX_VERTICES];
 
+// gouraud shading table
+static uint16_t shadetab[2][256];
 
 void test3d_init()
 {
     vt = new vec3f[MAX_VERTICES];
     facesort = new face_sort_t[MAX_FACES];
+
+    // calculate shading table
+    argb32 c0, c1;
+#if 1
+    c0.r=60; c0.g=40+4; c0.b=40+2; c1.r=255; c1.g=240, c1.b=96;
+    pal_lerp_single_rgb555_256(shadetab[1], c0, c1);
+    c0.r=20; c0.g=20+4; c0.b=20+2; c1.r=40; c1.g=40, c1.b=40;
+    pal_lerp_single_rgb555_256(shadetab[0], c0, c1);
+#else
+    c0.r=60; c0.g=40+4; c0.b=40+2; c1.r=255; c1.g=32, c1.b=32;
+    pal_lerp_single_rgb555_256(shadetab[1], c0, c1);
+    c0.r=40; c0.g=40+4; c0.b=40+2; c1.r=255; c1.g=255, c1.b=255;
+    pal_lerp_single_rgb555_256(shadetab[0], c0, c1);
+#endif
 }
 
 void test3d_run()
@@ -47,6 +64,9 @@ void test3d_run()
 
     static const float FOV = 160;
     static vec4f bbox = {.x = 0, .y = 0, .z = X_RES-1, .w = Y_RES-1};
+
+    // calculate shading table
+
 
     fbIdx = 0;
     uint32_t frame_counter = 0;
@@ -130,7 +150,7 @@ void test3d_run()
                 ff[vtx].fuv = (vec2f*)obj->t + idx[vtx].t;
             }
 
-#if 1
+#if 0
             // flat shading
             float dotNL = max(dot(objf->fn, os_l), 0.0f);
             int color = (int)(dotNL * 31) * 0x421;
@@ -142,6 +162,21 @@ void test3d_run()
                 case 0: case 1: case 2: break;
                 case 3:     mytmap_draw_tri_flat_16(ff, color); break;
                 default:    mytmap_draw_poly_flat_16(ff, poly_count, color); break;
+            } 
+#endif
+#if 1
+            // gouraud shading
+            for (int vtx = 0; vtx < objf->length; vtx++) {
+                float dotNL = max(dot(obj->n[idx[vtx].n], os_l), 0.02f);
+                //float l = 0.4*dotNL + 0.6*pow(dotNL,16.0);
+                //float dotNL = ff[vtx].fp->z * 0.7;
+                ff[vtx].fl = dotNL * 250; // fix dithering
+            }
+            int poly_count = clippoly(ff, 3, CLIP_BOUNDARY_MASK | CLIP_FLAGS_L, &bbox);
+            switch(poly_count) {
+                case 0: case 1: case 2: break;
+                case 3:     mytmap_draw_tri_gouraud_16 (ff, shadetab[objf->mat]); break;
+                default:    mytmap_draw_poly_gouraud_16(ff, poly_count, shadetab[objf->mat]); break;
             } 
 #endif
             fs++;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <math.h>
 
 #ifndef min
