@@ -1,0 +1,49 @@
+// ---------------
+.program dvi_rep1_8bpp
+.clock_div 1
+.fifo txrx
+.in  32 right auto 32
+.out 32 right auto 32
+
+.wrap_target
+    out x, 8
+    in  x, 8
+.wrap
+
+// ---------------
+.program dvi_rep1_16bpp
+.clock_div 1
+.fifo txrx
+.in  32 right auto 32
+.out 32 right auto 32
+
+.wrap_target
+    out x, 16
+    in  x, 16
+.wrap
+
+// ---------------
+.program dvi_rep2_8bpp
+.clock_div 1
+.fifo txrx
+.in  32 right auto 32
+.out 32 right auto 32
+
+.wrap_target
+    out x, 8
+    in  x, 8
+    in  x, 8
+.wrap
+
+// ---------------
+.program dvi_rep2_16bpp
+.clock_div 1
+.fifo txrx
+.in  32 right auto 32
+.out 32 right auto 32
+
+.wrap_target
+    out x, 16
+    in  x, 16
+    in  x, 16
+.wrap
