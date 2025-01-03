@@ -45,6 +45,7 @@ add_executable(dh2025w_demo
 	core1.cpp
 
 	misc/fbstuff.cpp
+        misc/linedraw.cpp
         misc/2dclip.cpp
         misc/mytmap.cpp
 
