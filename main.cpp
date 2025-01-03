@@ -17,331 +17,108 @@
 #include <string.h>
 
 #include "dvi.h"
+#include "defs.h"
+#include "core1.h"
 
-// picture (TEMP!)
-#include "512x384_rgb565.h"
-#define framebuf pic_512x384
-#define IMAGE_WIDTH         512
-#define IMAGE_HEIGHT        384
-#define IMAGE_PIXEL_FORMAT  DVI_PIXEL_FORMAT_RGB565
-#define PIXEL_REP_FACTOR    DVI_PIXEL_REP_2
-#define BYTES_PER_PIXEL     2
-#define IMAGE_PITCH         512*sizeof(uint16_t)
-
-// -----------------------------------
-
-#define CLK_SYS_MUL          1
-//#define HSTX_SERIAL_DEBUG
-
-#define PIXELS_PER_WORD      4
-
-#define MODE_H_SYNC_POLARITY 0
-#define MODE_H_FRONT_PORCH   16
-#define MODE_H_SYNC_WIDTH    96
-#define MODE_H_BACK_PORCH    48
-#define MODE_H_ACTIVE_PIXELS 640
-#define MODE_H_ACTIVE_PIXELS_PITCH (MODE_H_ACTIVE_PIXELS*4)/PIXELS_PER_WORD
-
-#define MODE_V_SYNC_POLARITY 0
-#define MODE_V_FRONT_PORCH   10
-#define MODE_V_SYNC_WIDTH    2
-#define MODE_V_BACK_PORCH    33
-#define MODE_V_ACTIVE_TOTAL  480
-#define MODE_V_ACTIVE_LINES  480
-#define MODE_V_TOP_BORDER    (MODE_V_ACTIVE_TOTAL-MODE_V_ACTIVE_LINES)/2
-#define MODE_V_BOTTOM_BORDER (MODE_V_ACTIVE_TOTAL-MODE_V_ACTIVE_LINES)/2
-#define MODE_PIXEL_CLOCK     25*MHZ
-
-#define MODE_H_TOTAL_PIXELS ( \
-    MODE_H_FRONT_PORCH + MODE_H_SYNC_WIDTH + \
-    MODE_H_BACK_PORCH  + MODE_H_ACTIVE_PIXELS \
-)
-#define MODE_V_TOTAL_LINES  ( \
-    MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH + \
-    MODE_V_BACK_PORCH  + MODE_V_ACTIVE_TOTAL \
-)
-
-// ----------------------------------------------------------------------------
-
-// HSTX pin layout
-// Murmulator 2 board
-static union dvi_hstx_pin_layout_t hstx_out_pins_murmulator2 = {
-    .clock_n = 0, .clock_p = 1,
-    .lane0_n = 2, .lane0_p = 3,
-    .lane1_n = 4, .lane1_p = 5,
-    .lane2_n = 6, .lane2_p = 7,
-};
-
-// ----------------------------------------------------------------------------
-// audio stuff
-
-#include "i2s.pio.h"
-
-#include "lxmplay.h"
-#include "lxmfile.h"
-#include "lxm_music.h"
-
-// in sample frames
-#ifndef AUDIO_BUFFER_SIZE_LOG2
-#define AUDIO_BUFFER_SIZE_LOG2 8
-#endif
-
-#define AUDIO_BUFFER_SIZE       (1 << AUDIO_BUFFER_SIZE_LOG2)
-
-// in bytes (stereo 16 bit)
-#define AUDIO_BUFFER_SIZE_BYTES (AUDIO_BUFFER_SIZE*4)
-
-// audio sample rate
-#define SAMPLE_RATE 44100
-
-// data pins definitions
-#define GPIO_I2S_DATA  9
-#define GPIO_I2S_CLOCK 10
-
-// audio buffer
-static __attribute__((aligned(AUDIO_BUFFER_SIZE_BYTES))) int16_t audiobuf[AUDIO_BUFFER_SIZE*2];
-
-volatile int irq_count = 0, callback_irq_count = 0;
-volatile uint32_t audio_buffer_offset;
-volatile uint32_t audio_buffer_timestamp;
-int audio_dma_channel;
-int audio_dma_irq       = DMA_IRQ_3;
-int audio_callback_irq  = FIRST_USER_IRQ;
-
-// LXM context
-lxm_context_t lxm_ctx;
-#define LXMPLAY_TEST
-
-// render audio
-__attribute__((noinline))
-void __not_in_flash_func(audio_render)(int16_t *dst, uint32_t frames, uint32_t timestamp) {
-    uint32_t t = timestamp;
-#if defined(LXMPLAY_TEST)
-    lxm_render(&lxm_ctx, dst, frames);
-#else
-    for (int i = 0; i < frames; i++) {
-        uint8_t a = (((t>>0)|(t>>2))|(t>>1))&((t>>8)^(t>>9));
-        dst[i*2+0] = dst[i*2+1] = ((int16_t)a << 7);
-        t++;
+// LED blinker in case of errors
+void blink_led_hang() {
+    while(1) {
+        gpio_put(PICO_DEFAULT_LED_PIN, 1);
+        sleep_ms(200);
+        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        sleep_ms(200);
     }
-#endif
 }
 
-// audio callback interrupt, called with lower priority
-void __not_in_flash_func(audio_callback_handler)() {
-    audio_render(audiobuf + audio_buffer_offset, AUDIO_BUFFER_SIZE/2, audio_buffer_timestamp);
-    callback_irq_count++;
-    irq_clear(audio_callback_irq);
+// ----------------------------------------------------------------------------
+// post request for the queue
+void queue_post_msg(uint32_t msg, void *ptr) {
+    queue_msg_t q = {.msg = msg, .ptr = ptr};
+    queue_add_blocking(&multicore_queue_msg, &q);
 }
 
-// audio interrupt handler
-void __not_in_flash_func(audio_dma_interrupt_handler)() {
-    if (dma_irqn_get_channel_status(audio_dma_irq - DMA_IRQ_0, audio_dma_channel)) {
-        audio_buffer_offset    ^= (AUDIO_BUFFER_SIZE/2)*2;
-        audio_buffer_timestamp += (AUDIO_BUFFER_SIZE/2);
-        irq_set_pending(audio_callback_irq);
-        irq_count++;
-        dma_irqn_acknowledge_channel(audio_dma_irq - DMA_IRQ_0, audio_dma_channel);
+// fetch response from queue
+uint32_t queue_get_resp(uint32_t timeout_us) {
+    if (timeout_us != 0) {
+        absolute_time_t deadline = time_us_64() + timeout_us;
+        while ((time_us_64() <= deadline) && queue_is_empty(&multicore_queue_resp));
+        if (queue_is_empty(&multicore_queue_resp)) return CORE1_RESP_TIMEOUT;
     }
+    uint32_t rtn;
+    queue_remove_blocking(&multicore_queue_resp, &rtn);
+    return rtn;
 }
 
 // ----------------------------------------------------------------------------
 // Main program
 
 int main(void) {
-    // bump up RP2350 voltage a bit
-    vreg_set_voltage(VREG_VOLTAGE_1_25);
-
-    // configure PLL for required pixel clock
+    // configure the almighty debug LED
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-    if (!set_sys_clock_khz((MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000, false)) {
-        // oops - blink the LED
-        gpio_put(PICO_DEFAULT_LED_PIN, 1);
-        sleep_ms(200);
-        gpio_put(PICO_DEFAULT_LED_PIN, 0);
-        sleep_ms(200);
-    };
 
     // init stdio
     stdio_init_all();
+    printf("-------------------------------\n");
+    
+    // bump up RP2350 voltage a bit
+    vreg_set_voltage(VREG_VOLTAGE_1_25);
 
+    printf("target sysclk = %d kHz\n", (MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000);
+    // configure PLL for required pixel clock
+    if (!set_sys_clock_khz((MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000, false)) {
+        printf("fatal: unable to configure sysclk!\n");
+        blink_led_hang();
+    };
     // configure as usual
     clock_configure_int_divider(clk_hstx, CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLK_SYS, 0, clock_get_hz(clk_sys), CLK_SYS_MUL);
 
-    // init DVI context
-    dvi_ctx_init();
+    // reinit stdio
+    stdio_init_all();
+    printf("sysclk switch success\n");
 
-    // setup timings
-    struct dvi_timings_t timings = {
-        .h = {
-            .front_porch = MODE_H_FRONT_PORCH,
-            .sync        = MODE_H_SYNC_WIDTH,
-            .back_porch  = MODE_H_BACK_PORCH,
-            .active      = MODE_H_ACTIVE_PIXELS
-        },
-        .v = {
-            .front_porch    = MODE_V_FRONT_PORCH,
-            .sync           = MODE_V_SYNC_WIDTH,
-            .back_porch     = MODE_V_BACK_PORCH,
-            .border_top     = MODE_V_TOP_BORDER,
-            .active         = MODE_V_ACTIVE_LINES,
-            .border_bottom  = MODE_V_BOTTOM_BORDER,
-            .refresh        = 60*1000,
-        },
-        .flags = DVI_TIMINGS_H_NEG | DVI_TIMINGS_V_NEG
-    };
-    dvi_set_timings(&timings, DVI_SET_TIMINGS_REFRESH_HBLANK);
-    printf("pixel clock = %d.%03d MHz, refresh rate = %d.%03d Hz\n",
-        (timings.pixelclock / MHZ),
-        (timings.pixelclock % MHZ)/1000,
-        timings.v.refresh / 1000,
-        timings.v.refresh % 1000
-    );
-    printf("h: fp % 3d, sync % 3d, bp % 3d, active % 3d, total %d\n",
-        timings.h.front_porch, timings.h.sync, timings.h.back_porch, timings.h.active,  timings.h.total
-    );
-    printf("v: fp % 3d, sync % 3d, bp % 3d, active % 3d, total %d\n",
-        timings.v.front_porch, timings.v.sync, timings.v.back_porch, timings.v.active,  timings.v.total
-    );
+    // alloc queues
+    queue_init(&multicore_queue_msg,  sizeof(queue_msg_t), 2);
+    queue_init(&multicore_queue_resp, sizeof(uint32_t), 2);
 
-    struct dvi_resources_t dvi_res;
-    int pix_fmt   = IMAGE_PIXEL_FORMAT;
-    int pix_flags = PIXEL_REP_FACTOR;
-    
-    dvi_get_resources_required(pix_fmt, 0, pix_flags, &dvi_res);
-    for (int i = 0; i < dvi_res.dma_channels_num; i++) {
-        dvi_res.dma_channels[i] = dma_claim_unused_channel(true);
-    }
-    dvi_res.dma_irq_line = DMA_IRQ_0;
-    
-    // allocate and configure free PIO
-    dvi_res.pio = pio0;
+    // start core1
+    printf("starting core 1...\n");
+    multicore_launch_core1(core1_task);
 
-    dvi_configure_pio(pix_fmt, 0, pix_flags, &dvi_res);
-    dvi_set_line_repeat(2);
-    dvi_set_framebuffer(framebuf, false);
-    dvi_set_pitch(IMAGE_PITCH, false);
-    dvi_configure_hstx_input(pix_fmt, pix_flags, dvi_res.xfer_mode, NULL);
-    dvi_configure_hstx_output(hstx_out_pins_murmulator2);
-    dvi_configure_xfer_mode(dvi_res.xfer_mode);
-    dvi_init_dma(&dvi_res);
-    dvi_start_dma();
-    printf("DVI output enabled\n");
-    printf("transfer mode: %d\n", dvi_res.xfer_mode);
-
-    // init audio output
-    // init LXM player
-    if (lxm_init(&lxm_ctx, 2, SAMPLE_RATE) != 0) {
-        printf("error: unable to init lxm!\n");
-        while (1);
-    }
-
-    if (lxm_load_mem(&lxm_ctx, lxm_music, lxm_music_size) != 0) {
-        printf("error: unable to load LXM module\n");
-        while (1);
-    };
-
-    // prefill audio buffer
-    audio_render(audiobuf + 0,                       AUDIO_BUFFER_SIZE/2, 0);
-    audio_render(audiobuf + (AUDIO_BUFFER_SIZE/2)*2, AUDIO_BUFFER_SIZE/2, AUDIO_BUFFER_SIZE/2);
-    audio_buffer_offset    = (AUDIO_BUFFER_SIZE/2)*2;
-    audio_buffer_timestamp = (AUDIO_BUFFER_SIZE/2);
-
-    // init I2S PIO
-    PIO i2s_pio;
-    uint i2s_sm; 
-    uint i2s_prog_offset;
-
-    // add program
-    pio_claim_free_sm_and_add_program(&audio_i2s_program, &i2s_pio, &i2s_sm, &i2s_prog_offset);
-    audio_i2s_program_init(i2s_pio, i2s_sm, i2s_prog_offset, GPIO_I2S_DATA, GPIO_I2S_CLOCK);
-    uint32_t div = (clock_get_hz(clk_sys) * 4) / SAMPLE_RATE;
-    pio_sm_set_clkdiv_int_frac(i2s_pio, i2s_sm, div >> 8u, div & 0xFFu);
-    pio_sm_set_enabled(i2s_pio, i2s_sm, true);
-
-    // set pin function
-    gpio_set_function(GPIO_I2S_DATA,        (gpio_function_t)((int)GPIO_FUNC_PIO0 + PIO_NUM(i2s_pio)));
-    gpio_set_function(GPIO_I2S_CLOCK,       (gpio_function_t)((int)GPIO_FUNC_PIO0 + PIO_NUM(i2s_pio)));
-    gpio_set_function(GPIO_I2S_CLOCK + 1,   (gpio_function_t)((int)GPIO_FUNC_PIO0 + PIO_NUM(i2s_pio)));
-
-    audio_dma_channel = dma_claim_unused_channel(true);
-    
-    dma_channel_config c = dma_channel_get_default_config(audio_dma_channel);
-    channel_config_set_dreq(&c, PIO_DREQ_NUM(i2s_pio, i2s_sm, true));
-    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
-    channel_config_set_read_increment(&c, true);
-    channel_config_set_write_increment(&c, false);
-    channel_config_set_ring(&c, false, AUDIO_BUFFER_SIZE_LOG2+2);
-    
-    // hook interrupt
-    dma_irqn_set_channel_enabled(audio_dma_irq - DMA_IRQ_0, audio_dma_channel, true);
-    irq_add_shared_handler(audio_dma_irq, audio_dma_interrupt_handler, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
-    irq_set_exclusive_handler(audio_callback_irq, audio_callback_handler);
-    irq_set_priority(audio_callback_irq, PICO_LOWEST_IRQ_PRIORITY);
-    irq_set_enabled(audio_dma_irq, true);
-    irq_set_enabled(audio_callback_irq, true);
-
-    // start DMA transfer
-    dma_channel_set_write_addr(audio_dma_channel, &i2s_pio->txf[i2s_sm], false);
-    dma_channel_set_read_addr(audio_dma_channel, audiobuf, false);
-    dma_channel_set_trans_count(
-        audio_dma_channel,
-        ((AUDIO_BUFFER_SIZE_BYTES/2)/sizeof(uint32_t)) | (DMA_CH0_TRANS_COUNT_MODE_VALUE_TRIGGER_SELF << DMA_CH0_TRANS_COUNT_MODE_LSB),
-        false
-    );
-    dma_channel_hw_addr(audio_dma_channel)->ctrl_trig = channel_config_get_ctrl_value(&c);
-
-
+    // test echo response
+    queue_post_msg(CORE1_MSG_NOP, 0);
+    uint32_t resp = queue_get_resp(20*1000);
+    if (resp != 0) {
+        printf("core 1 ping fail: rtn = %d\n", resp);
+        blink_led_hang();
+    } else printf("core 1 ping success\n");
 
 #if 1
-    // scroll!
-    while (1) {
-
-#if 1
-        // wait for vblank
-        int frame = dvi_get_frame_count();
-        dvi_wait_for_vblank();
-        int x = (int)(-95*cos(frame*0.06f) + 96);
-        int y = (int)(-71*cos(frame*0.05f) + 72);
-        dvi_set_framebuffer(framebuf + (x*BYTES_PER_PIXEL) + (y*IMAGE_PITCH), false);
-        dvi_set_pixel_panning(x, false);
-#endif
-
-#if 0
-        // wait for vblank
-        int frame = dvi_get_frame_count();
-        dvi_wait_for_vblank();
-        int x = frame & 63;
-        int y = 0;
-        dvi_set_framebuffer(framebuf + (x*BYTES_PER_PIXEL) + (y*IMAGE_PITCH), false);
-        dvi_set_pixel_panning(x, false);
-#endif
-
-#if 0
-#if 0
-        // wait for vblank
-        int frame = dvi_get_frame_count();
-        dvi_wait_for_vblank();
-        for (int y = 0; y < timings.v.active; y++) {
-            int frameofs = ((int)(y + frame*1.0f + (25.0f+20.0f*sin(frame*0.04f))*sin(frame*0.08f + y*0.02f)));
-            while (frameofs < 0) frameofs += timings.v.active;
-            frameofs %= timings.v.active;
-            dvi_wait_for_hblank();
-            dvi_set_offset(frameofs*MODE_H_ACTIVE_PIXELS);
-        }
-#else
-        // wait for vblank
-        int frame = dvi_get_frame_count();
-        dvi_wait_for_vblank();
-        for (int y = 0; y < timings.v.active; y++) {
-            int x = (25.0f+20.0f*sin(frame*0.04f))*sin(frame*0.08f + (y)*0.02f);
-            dvi_wait_for_hblank();
-            dvi_set_offset((y)*IMAGE_PITCH + (x*BYTES_PER_PIXEL));
-            dvi_set_pixel_panning(x, true);
-        }
-#endif
-#endif
+    // clear framebuffers
+    {   
+        uint16_t *p = fb[0];
+        for (int y = 0; y < Y_RES; y++) for (int x = 0; x < X_RES; x++) *p++ = (x ^ y);
+        p = fb[1];
+        for (int y = 0; y < Y_RES; y++) for (int x = 0; x < X_RES; x++) *p++ = ((x & 31) << 0) | ((y & 31) << 5) | (((x ^ y) & 31) << 10);
     }
 #endif
+
+    // start video
+    queue_post_msg(CORE1_MSG_START_VIDEO, 0);
+    if ((resp = queue_get_resp(0)) != 0) {
+        printf("unable to start video: resp = %d\n", resp);
+        blink_led_hang();
+    }
+
+    fbIdx = 0;
+    while(1) {
+        dvi_wait_for_vblank();
+        dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
+        float t = time_us_32() / 1000000.0f;
+        for (int i = 0; i < 20; i++) {
+            int x = (X_RES/2-1)*sin(t*0.5 + i*0.3)+(X_RES/2);
+            int y = (Y_RES/2-1)*cos(t*0.6 + i*0.3)+(Y_RES/2);
+            fb[fbIdx][y*X_RES+x] = 0x7FFF;
+        }
+    }
 }
