@@ -100,6 +100,13 @@ int main(void) {
         blink_led_hang();
     }
 
+    // start audio
+    queue_post_msg(CORE1_MSG_START_MUSIC, 0);
+    if ((resp = queue_get_resp(0)) != 0) {
+        printf("unable to start audio: resp = %d\n", resp);
+        blink_led_hang();
+    }
+
     fbIdx = 0;
     while(1) {
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
