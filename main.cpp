@@ -67,8 +67,10 @@ int main(void) {
     stdio_init_all();
     printf("-------------------------------\n");
     
+#if 0
     // bump up RP2350 voltage a bit
     vreg_set_voltage(VREG_VOLTAGE_1_25);
+#endif
 
     printf("target sysclk = %d kHz\n", (MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000);
     // configure PLL for required pixel clock
