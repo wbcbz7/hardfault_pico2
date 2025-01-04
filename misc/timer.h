@@ -7,3 +7,5 @@ void ftimer_set(float time);
 // get timer value
 float ftimer_get();
 
+// display raster dot of given color
+void rasterdot(uint32_t color);

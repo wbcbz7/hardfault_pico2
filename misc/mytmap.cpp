@@ -4,6 +4,9 @@
 #include "vec.h"
 #include "fxmath.h"
 #include "mytmap.h"
+#include "hardware/interp.h"
+
+#define USE_INTERP
 
 extern "C" {
 
@@ -36,6 +39,10 @@ static uint32_t  mytmap_pitch;
 
 #define TMAP_EDGE_INTFLOAT(a) union {int32_t a; float f##a;};
 
+#define SUBPIXEL_TABLE
+#define SUBPIXEL_BITS 2
+#define TMAP_PRESTEP_INTFLOAT(a) union {int32_t a[1 << SUBPIXEL_BITS]; float f##a[1 << SUBPIXEL_BITS];};
+
 enum {
     SIDE_LEFT  = 0,
     SIDE_RIGHT = 1,
@@ -51,8 +58,6 @@ struct tmap_edge_lerp_t {
     TMAP_EDGE_INTFLOAT(dudy);
     TMAP_EDGE_INTFLOAT(v);          // v or v/z
     TMAP_EDGE_INTFLOAT(dvdy);
-    TMAP_EDGE_INTFLOAT(ooz);        // 1/z
-    TMAP_EDGE_INTFLOAT(doozdy);
     TMAP_EDGE_INTFLOAT(l);          // l or l/z
     TMAP_EDGE_INTFLOAT(dldy);
     TMAP_EDGE_INTFLOAT(u2);         // same as u for dual texture
@@ -75,10 +80,15 @@ struct poly_lerp_gradients_t {
 
     TMAP_EDGE_INTFLOAT(dudx);
     TMAP_EDGE_INTFLOAT(dvdx);
-    TMAP_EDGE_INTFLOAT(doozdx);
     TMAP_EDGE_INTFLOAT(dldx);
     TMAP_EDGE_INTFLOAT(du2dx);
     TMAP_EDGE_INTFLOAT(dv2dx);
+
+    TMAP_PRESTEP_INTFLOAT(dudx_prestep);
+    TMAP_PRESTEP_INTFLOAT(dvdx_prestep);
+    TMAP_PRESTEP_INTFLOAT(dldx_prestep);
+    TMAP_PRESTEP_INTFLOAT(du2dx_prestep);
+    TMAP_PRESTEP_INTFLOAT(dv2dx_prestep);
 };
 
 static poly_lerp_gradients_t grad;
@@ -98,6 +108,62 @@ static int32_t section_heights[MAX_SECTIONS+1];   // leave place for null sectio
 void mytmap_polydraw_init(void *buf, int pitch) {
     mytmap_dst = (uint8_t*)buf;
     mytmap_pitch = pitch;
+}
+
+// ------------------------------------
+// setup interpolators for 16.16 fixedpoint operation
+// bit_bias shifts result to the left (for halfword/word tables)
+void mytmap_interp_setup_l(interp_hw_t *interp, void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
+    interp_config cfg = interp_default_config();
+    interp_config_set_add_raw(&cfg, true);
+
+    // setup lane 0
+    interp_config_set_shift(&cfg, fract_bits - bit_bias);
+    interp_config_set_mask(&cfg, bit_bias, bit_bias + width_bits - 1);
+    interp_set_config(interp, 0, &cfg);
+
+    // setup lane 1
+    interp->base[1] = interp->accum[1] = 0;    // lane 1 is nop
+
+    // setup lane 2
+    interp->base[2] = (uintptr_t) texture;
+}
+
+void mytmap_interp_setup_l_2x2(interp_hw_t *interp, void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
+    interp_config cfg = interp_default_config();
+    interp_config_set_add_raw(&cfg, true);
+
+    // setup lane 0
+    interp_config_set_shift(&cfg, (fract_bits - bit_bias) & 31);
+    interp_config_set_mask(&cfg, bit_bias, bit_bias + width_bits - 1);
+    interp_set_config(interp, 0, &cfg);
+
+    // setup lane 1 (the dithering lane)
+    interp_config_set_shift(&cfg, (-bit_bias-1) & 31);
+    interp_config_set_mask(&cfg, bit_bias+1, bit_bias + 1 + 2 - 1);
+    interp_set_config(interp, 1, &cfg);
+    interp->accum[1] = interp->base[1] = 2;
+
+    // setup lane 2
+    interp->base[2] = (uintptr_t) texture;
+}
+
+void mytmap_interp_setup_uv(interp_hw_t *interp, void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
+    interp_config cfg = interp_default_config();
+    interp_config_set_add_raw(&cfg, true);
+
+    // setup lane 0
+    interp_config_set_shift(&cfg, fract_bits - bit_bias);
+    interp_config_set_mask(&cfg, bit_bias, bit_bias + width_bits - 1);
+    interp_set_config(interp, 0, &cfg);
+
+    // setup lane 1
+    interp_config_set_shift(&cfg, fract_bits - width_bits - bit_bias);
+    interp_config_set_mask(&cfg, bit_bias + width_bits, bit_bias + width_bits + height_bits - 1);
+    interp_set_config(interp, 1, &cfg);
+
+    // setup lane 2
+    interp->base[2] = (uintptr_t) texture;
 }
 
 // ------------------------------------
@@ -242,7 +308,79 @@ static int mytmap_add_edge_uv_ffx(tmap_edge_lerp_t *edge, int32_t side, tmap_vtx
     return height;
 }
 
-#if 0
+#ifdef USE_INTERP
+#if 1
+static void __not_in_flash_func(mytmap_draw_sections_affine_l_16)(uint8_t *dst, int sections, int start_y, int32_t *heights, tmap_edge_lerp_t *edges) {
+    // common tmap code here
+    tmap_edge_lerp_t *left = edge_lerp + 0, *right = edge_lerp + 1, *next_edge = edge_lerp + 2;
+
+    int ditherbase = start_y & 1 ? 3 : 0;
+    // draw polygon sections
+    do {
+        int lines = *heights++;
+        if (lines > 0) do {
+            int32_t start   = ceilx(left->x);
+            int32_t width   = ceilx(right->x) - start;
+            int32_t prestep = (-left->x)&0xFFFF;
+#ifdef SUBPIXEL_TABLE
+            int32_t l = left->l + grad.dldx_prestep[prestep >> (16 - SUBPIXEL_BITS)];
+#else
+            int32_t l = left->l + imul16(prestep, grad.dldx);
+#endif
+            MYTMAP_INTERP_SHADETAB->accum[0] = l;
+            MYTMAP_INTERP_SHADETAB->accum[1] = ditherbase;
+            uint16_t *p = (uint16_t*)dst + start;
+            if (width > 0) do {
+                *p++ = *(uint16_t*)MYTMAP_INTERP_SHADETAB->pop[2];
+            } while (--width);
+            left->x  += left->dxdy;
+            right->x += right->dxdy;
+            left->l  += left->dldy;
+            dst += mytmap_pitch;
+            ditherbase ^= 3;
+        } while (--lines);
+
+        // switch to next section
+        next_edge->side ? right = next_edge : left = next_edge;
+        next_edge++;
+    } while (--sections);
+}
+#else
+static void __not_in_flash_func(mytmap_draw_sections_affine_l_16)(uint8_t *dst, int sections, int start_y, int32_t *heights, tmap_edge_lerp_t *edges) {
+    // common tmap code here
+    tmap_edge_lerp_t *left = edge_lerp + 0, *right = edge_lerp + 1, *next_edge = edge_lerp + 2;
+
+    // draw polygon sections
+    do {
+        int lines = *heights++;
+        if (lines > 0) do {
+            int32_t start   = ceilx(left->x);
+            int32_t width   = ceilx(right->x) - start;
+            int32_t prestep = (-left->x)&0xFFFF;
+#ifdef SUBPIXEL_TABLE
+            int32_t l = left->l + grad.dldx_prestep[prestep >> (16 - SUBPIXEL_BITS)];
+#else
+            int32_t l = left->l + imul16(prestep, grad.dldx);
+#endif
+            MYTMAP_INTERP_SHADETAB->accum[0] = l;
+            uint16_t *p = (uint16_t*)dst + start;
+            if (width > 0) do {
+                *p++ = *(uint16_t*)MYTMAP_INTERP_SHADETAB->pop[2];
+            } while (--width);
+            left->x  += left->dxdy;
+            right->x += right->dxdy;
+            left->l  += left->dldy;
+            dst += mytmap_pitch;
+        } while (--lines);
+
+        // switch to next section
+        next_edge->side ? right = next_edge : left = next_edge;
+        next_edge++;
+    } while (--sections);
+}
+#endif
+#else
+#if 1
 static void __not_in_flash_func(mytmap_draw_sections_affine_l_16)(uint8_t *dst, int sections, int start_y, int32_t *heights, tmap_edge_lerp_t *edges) {
     // common tmap code here
     tmap_edge_lerp_t *left = edge_lerp + 0, *right = edge_lerp + 1, *next_edge = edge_lerp + 2;
@@ -305,6 +443,7 @@ static void __not_in_flash_func(mytmap_draw_sections_affine_l_16)(uint8_t *dst, 
         next_edge++;
     } while (--sections);
 }
+#endif
 #endif
 
 static void mytmap_draw_sections_affine_uv_16(uint8_t *dst, int sections, int32_t *heights, tmap_edge_lerp_t *edges) {
@@ -703,6 +842,15 @@ void mytmap_draw_tri_gouraud_16(tmap_vtx_uv_t *f, uint16_t *shadetab) {
 
     // calculate gradients
     grad.dldx  = (int32_t)((((lb - lt) * mid_t) + (lt - lm)) * inv_width_64k);
+#ifdef SUBPIXEL_TABLE
+    {
+        int32_t l = 0;
+        int32_t dl = (grad.dldx >> SUBPIXEL_BITS);
+        for (int i = 0; i < (1 << SUBPIXEL_BITS); i++) {
+            grad.dldx_prestep[i] = l; l += dl;
+        }
+    }
+#endif
 
     // compute edge sections
     mytmap_add_edge_l_ffx(edge_lerp + 0, SIDE_LEFT,  top_vtx, left_vtx);
@@ -719,6 +867,10 @@ void mytmap_draw_tri_gouraud_16(tmap_vtx_uv_t *f, uint16_t *shadetab) {
     // call common filler
     grad.texture16  = shadetab;
     grad.uvmask     = 0xFF;     // not needed at all? :p
+
+#ifdef USE_INTERP
+    MYTMAP_INTERP_SHADETAB->base[0] = grad.dldx;
+#endif
     mytmap_draw_sections_affine_l_16(dst_start, 2, top_vtx->cy, section_heights, edge_lerp);
 }
 
@@ -767,6 +919,15 @@ void mytmap_draw_poly_gouraud_16(tmap_vtx_uv_t *f, uint32_t vtxcount, uint16_t *
 
     // calculate gradients
     grad.dldx  = (int32_t)((((lb - lt) * mid_t) + (lt - lm)) * inv_width_64k);
+#ifdef SUBPIXEL_TABLE
+    {
+        int32_t l = 0;
+        int32_t dl = (grad.dldx >> SUBPIXEL_BITS);
+        for (int i = 0; i < (1 << SUBPIXEL_BITS); i++) {
+            grad.dldx_prestep[i] = l; l += dl;
+        }
+    }
+#endif
 
     // add first two edges
     mytmap_add_edge_l_ffx(edge_lerp + 0, SIDE_LEFT,  top_vtx, left_vtx);
@@ -812,6 +973,9 @@ void mytmap_draw_poly_gouraud_16(tmap_vtx_uv_t *f, uint32_t vtxcount, uint16_t *
     // call common filler
     grad.texture16  = shadetab;
     grad.uvmask     = 0xFF;     // not needed at all? :p
+#ifdef USE_INTERP
+    MYTMAP_INTERP_SHADETAB->base[0] = grad.dldx;
+#endif
     mytmap_draw_sections_affine_l_16(dst_start, section_idx, top_vtx->cy, section_heights, edge_lerp);
 }
 

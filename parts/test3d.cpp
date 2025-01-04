@@ -12,6 +12,7 @@
 #include <incobj.h>
 #include <string.h>
 #include <palerp.h>
+#include <timer.h>
 
 #include "../objects/duck3ds.h"
 
@@ -64,7 +65,7 @@ void test3d_run()
 {
     const incobj_t *obj = duck3ds_object;
 
-    static const float FOV = 160;
+    static const float FOV = 160.0f;
     static vec4f bbox = {.x = 0, .y = 0, .z = X_RES-1, .w = Y_RES-1};
 
     // calculate shading table
@@ -75,6 +76,7 @@ void test3d_run()
     while(1) {
         float t = frame_counter / 60.0f;
         fb_fill(&fb[fbIdx], 0, X_RES*Y_RES);
+        rasterdot(argb_to_555(0, 0, 255));
         mytmap_polydraw_init(&fb[fbIdx], X_RES*BYTES_PER_PIXEL);
 #if 1
         vec3f cam = {0, 0.3, 2.6};
@@ -113,6 +115,7 @@ void test3d_run()
             vt[i].z = rz * (1.0f / FOV);
         }
         vtx_pos += obj->total_pos;
+        rasterdot(argb_to_555(255, 0, 0));
 
 #if 1
         // do both back face culling and putting faces to sorting list
@@ -122,10 +125,10 @@ void test3d_run()
             for (int i = 0; i < obj->total_faces; i++) {
                 // back face culling
                 vec3f p0; sub3f(p0, os_cam, obj->p[obj->i[objf->start].p]);
-                if (dot(p0, objf->fn) >= 0.0) {
+                if (dot(p0, objf->fn) >= 0.0f) {
                     // calculate average Z
                     const incobj_idx_t *idx = obj->i + objf->start;
-                    float avg_z = (vt[idx[0].p].z+vt[idx[1].p].z+vt[idx[2].p].z)*(65536.0/3.0f);
+                    float avg_z = (vt[idx[0].p].z+vt[idx[1].p].z+vt[idx[2].p].z)*(65536.0f/3.0f);
                     fs->depth = avg_z;
                     fs->face  = objf;
                     fs++;
@@ -136,6 +139,12 @@ void test3d_run()
         }
         face_sort(facesort, faces_to_draw);
         //face_sort_radix(facesort, facesort_tmp, faces_to_draw);
+#endif
+        rasterdot(argb_to_555(255, 0, 255));
+
+#if 1
+        // setup HW interpolators
+        mytmap_interp_setup_l_2x2(MYTMAP_INTERP_SHADETAB, shadetab, 16, 8, 0, 1);
 #endif
 
 #if 1
@@ -174,6 +183,7 @@ void test3d_run()
                 //float dotNL = ff[vtx].fp->z * 0.7;
                 ff[vtx].fl = dotNL * 250; // fix dithering
             }
+            mytmap_interp_set_texture(MYTMAP_INTERP_SHADETAB, shadetab[objf->mat]);
             int poly_count = clippoly(ff, 3, CLIP_BOUNDARY_MASK | CLIP_FLAGS_L, &bbox);
             switch(poly_count) {
                 case 0: case 1: case 2: break;
@@ -195,13 +205,7 @@ void test3d_run()
         }
 #endif
         // draw "rasterbar"
-        {
-            int scanline = dvi_get_current_active_scanline() / 2;
-            if (scanline >= 0 && scanline < Y_RES-1) {
-                fb[fbIdx^1][(scanline+1)*X_RES] = 0x7FFF;
-            }
-            
-        }
+        rasterdot(argb_to_555(255, 255, 255));
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
         dvi_wait_for_vblank();
         frame_counter++;

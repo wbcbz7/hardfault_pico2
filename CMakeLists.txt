@@ -37,7 +37,6 @@ project(dh2025w_demo C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
-
 add_executable(dh2025w_demo
         main.cpp
         dvi.c
@@ -82,7 +81,7 @@ target_link_libraries(dh2025w_demo
         hardware_gpio
         pico_sync
         pico_util
-        )
+)
 
 # create map/bin/hex/uf2 file etc.
 pico_add_extra_outputs(dh2025w_demo)
