@@ -16,6 +16,8 @@
 
 #include "../objects/duck3ds.h"
 
+#include "../textures/owl.h"
+
 enum {
     MAX_VERTICES            = 500,
     MAX_NORMALS             = 500,
@@ -142,9 +144,11 @@ void test3d_run()
 #endif
         rasterdot(argb_to_555(255, 0, 255));
 
-#if 1
-        // setup HW interpolators
+                // setup HW interpolators
+#if 0
         mytmap_interp_setup_l_2x2(MYTMAP_INTERP_SHADETAB, shadetab, 16, 8, 0, 1);
+#else
+        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE, shadetab, 16, 8, 8, 1);
 #endif
 
 #if 1
@@ -176,6 +180,18 @@ void test3d_run()
             } 
 #endif
 #if 1
+            // texture mapping
+            mytmap_interp_set_texture(MYTMAP_INTERP_TEXTURE, texture_owl);
+            {
+                int poly_count = clippoly(ff, 3, CLIP_BOUNDARY_MASK | CLIP_FLAGS_UV, &bbox);
+                switch(poly_count) {
+                    case 0: case 1: case 2: break;
+                    case 3:     mytmap_draw_tri_tex_16 (ff, (uint16_t *)texture_owl); break;
+                    default:    mytmap_draw_poly_tex_16(ff, poly_count, (uint16_t *)texture_owl); break;
+                }
+            }
+#endif
+#if 0
             // gouraud shading
             for (int vtx = 0; vtx < objf->length; vtx++) {
                 float dotNL = max(dot(obj->n[idx[vtx].n], os_l), 0.02f);

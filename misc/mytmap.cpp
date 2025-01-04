@@ -445,8 +445,40 @@ static void __not_in_flash_func(mytmap_draw_sections_affine_l_16)(uint8_t *dst, 
 }
 #endif
 #endif
+#ifdef USE_INTERP
+static void __not_in_flash_func(mytmap_draw_sections_affine_uv_16)(uint8_t *dst, int sections, int32_t *heights, tmap_edge_lerp_t *edges) {
+    // common tmap code here
+    tmap_edge_lerp_t *left = edge_lerp + 0, *right = edge_lerp + 1, *next_edge = edge_lerp + 2;
 
-static void mytmap_draw_sections_affine_uv_16(uint8_t *dst, int sections, int32_t *heights, tmap_edge_lerp_t *edges) {
+    // draw polygon sections
+    do {
+        int lines = *heights++;
+        if (lines > 0) do {
+            int32_t start   = ceilx(left->x);
+            int32_t width   = ceilx(right->x) - start;
+            int32_t prestep = (-left->x)&0xFFFF;
+            int32_t u = left->u + imul16(prestep, grad.dudx);
+            int32_t v = left->v + imul16(prestep, grad.dvdx);
+            MYTMAP_INTERP_TEXTURE->accum[0] = u;
+            MYTMAP_INTERP_TEXTURE->accum[1] = v;
+            uint16_t *p = (uint16_t*)dst + start;
+            if (width > 0) do {
+                *p++ = *(uint16_t*)MYTMAP_INTERP_TEXTURE->pop[2];
+            } while (--width);
+            left->x  += left->dxdy;
+            right->x += right->dxdy;
+            left->u  += left->dudy;
+            left->v  += left->dvdy;
+            dst += mytmap_pitch;
+        } while (--lines);
+
+        // switch to next section
+        next_edge->side ? right = next_edge : left = next_edge;
+        next_edge++;
+    } while (--sections);
+}
+#else
+static void __not_in_flash_func(mytmap_draw_sections_affine_uv_16)(uint8_t *dst, int sections, int32_t *heights, tmap_edge_lerp_t *edges) {
     // common tmap code here
     tmap_edge_lerp_t *left = edge_lerp + 0, *right = edge_lerp + 1, *next_edge = edge_lerp + 2;
 
@@ -477,6 +509,7 @@ static void mytmap_draw_sections_affine_uv_16(uint8_t *dst, int sections, int32_
         next_edge++;
     } while (--sections);
 }
+#endif
 
 // -------------------------------
 // affine + multitex, float
@@ -978,6 +1011,185 @@ void mytmap_draw_poly_gouraud_16(tmap_vtx_uv_t *f, uint32_t vtxcount, uint16_t *
 #endif
     mytmap_draw_sections_affine_l_16(dst_start, section_idx, top_vtx->cy, section_heights, edge_lerp);
 }
+
+// multitexture, 16bpp
+void mytmap_draw_tri_tex_16(tmap_vtx_uv_t *f, uint16_t *tex) {
+    tmap_vtx_uv_t *top_vtx, *bottom_vtx, *mid_vtx, *left_vtx, *right_vtx;
+
+    // calculate index, precompute ceil(y)
+    // note type punning here - since Y for all vertices is positive this should be fine
+    int index =            ((f[0].p->y < f[1].p->y) ? 1 : 0); f[0].cy = ceil(f[0].fp->y);
+    index = (index << 1) | ((f[1].p->y < f[2].p->y) ? 1 : 0); f[1].cy = ceil(f[1].fp->y);
+    index = (index << 1) | ((f[2].p->y < f[0].p->y) ? 1 : 0); f[2].cy = ceil(f[2].fp->y);
+    if (index == 0) return; // degenerate case
+
+    const tri_setup_t *ps = tri_setup_table + index;
+
+    // get vertex pointers
+    top_vtx     = f + ps->top;
+    mid_vtx     = f + ps->mid;
+    bottom_vtx  = f + ps->bottom;
+    left_vtx    = f + ps->left;
+    right_vtx   = f + ps->right;
+
+    // calculate gradients
+    vec3f *pt = top_vtx->fp, *pm = mid_vtx->fp, *pb = bottom_vtx->fp;
+    float inv_height = 1.0f / (pb->y - pt->y);
+    float mid_t = (pm->y - pt->y) * inv_height;
+    float longest_width = ((pb->x - pt->x) * mid_t) + (pt->x - pm->x);
+    if (longest_width == 0.0f) return;     // nothing to draw!
+    float inv_width     = 1.0f / longest_width;
+    float inv_width_64k = 65536.0f * inv_width;
+
+    vec2f *tt = top_vtx->fuv,  *tm = mid_vtx->fuv,  *tb = bottom_vtx->fuv;
+    vec2f *mt = top_vtx->fuv2, *mm = mid_vtx->fuv2, *mb = bottom_vtx->fuv2;
+
+    // prepare texture coordinates
+    int32_t scale_u = 256;
+    int32_t scale_v = 256;
+    for (int vtx = 0; vtx < 3; vtx++) {
+        tmap_texcoord[vtx].x = (f[vtx].fuv->x * scale_u);
+        tmap_texcoord[vtx].y = (f[vtx].fuv->y * scale_v);
+        f[vtx].fuv = tmap_texcoord + vtx;
+    }
+
+    // calculate gradients
+    grad.dudx  = (int32_t)((((tb->x - tt->x) * mid_t) + (tt->x - tm->x)) * inv_width_64k * scale_u);
+    grad.dvdx  = (int32_t)((((tb->y - tt->y) * mid_t) + (tt->y - tm->y)) * inv_width_64k * scale_v);
+
+    // compute edge sections
+    mytmap_add_edge_multiuv_ffx(edge_lerp + 0, SIDE_LEFT,  top_vtx, left_vtx);
+    mytmap_add_edge_multiuv_ffx(edge_lerp + 1, SIDE_RIGHT, top_vtx, right_vtx);
+    mytmap_add_edge_multiuv_ffx(edge_lerp + 2, ps->side,   mid_vtx, bottom_vtx);
+    
+    // and section heights
+    section_heights[0] = mid_vtx->cy    - top_vtx->cy;
+    section_heights[1] = bottom_vtx->cy - mid_vtx->cy;
+
+    // get display start
+    uint8_t* dst_start = mytmap_dst + ((top_vtx->cy) * mytmap_pitch);
+
+    // call common filler
+    grad.texture16  = tex;
+    grad.uvmask     = 0xFFFF;
+#ifdef USE_INTERP
+    MYTMAP_INTERP_TEXTURE->base[0] = grad.dudx;
+    MYTMAP_INTERP_TEXTURE->base[1] = grad.dvdx;
+#endif
+    mytmap_draw_sections_affine_uv_16(dst_start, 2, section_heights, edge_lerp);
+}
+
+// draw arbitrary polygon (expects to be 2D clipped since it's affine mapping)
+void mytmap_draw_poly_tex_16(tmap_vtx_uv_t *f, uint32_t vtxcount, uint16_t *tex) {
+    tmap_vtx_uv_t *top_vtx, *bottom_vtx, *mid_vtx, *left_vtx, *right_vtx, *start_vtx, *end_vtx;
+
+    start_vtx   = f;
+    end_vtx     = f + vtxcount - 1;
+
+    // find top and bottom vertices
+    int top_idx = 0, bottom_idx = 0, mid_idx; int i = 1;
+    f[0].cy = ceil(f[0].fp->y);
+    do {
+        f[i].cy = ceil(f[i].fp->y); // precalc ceil(y)
+        if (f[i].fp->y < f[top_idx].fp->y) {
+            top_idx = i; 
+        } else if (f[i].fp->y > f[bottom_idx].fp->y) {
+            bottom_idx = i;
+        }
+    } while (++i != vtxcount);
+    if (top_idx == bottom_idx) return;  // nothing to draw!
+
+    // find middle vertex
+    mid_idx = top_idx + 1; if (mid_idx >= vtxcount) mid_idx = 0;
+    if (mid_idx == bottom_idx) {
+        mid_idx = bottom_idx + 1; if (mid_idx >= vtxcount) mid_idx = 0;
+    }
+    
+    top_vtx     = f + top_idx;
+    bottom_vtx  = f + bottom_idx;
+    mid_vtx     = f + mid_idx;
+    left_vtx    = f + top_idx + 1; if (left_vtx  > end_vtx)   left_vtx   = start_vtx;
+    right_vtx   = f + top_idx - 1; if (right_vtx < start_vtx) right_vtx  = end_vtx;
+
+    // calculate gradients
+    vec3f *pt = top_vtx->fp, *pm = mid_vtx->fp, *pb = bottom_vtx->fp;
+    float inv_height = 1.0f / (pb->y - pt->y);
+    float mid_t = (pm->y - pt->y) * inv_height;
+    float longest_width = ((pb->x - pt->x) * mid_t) + (pt->x - pm->x);
+    if (longest_width == 0.0f) return;     // nothing to draw!
+    float inv_width     = 1.0f / longest_width;
+    float inv_width_64k = 65536.0f * inv_width;
+
+    vec2f *tt = top_vtx->fuv,  *tm = mid_vtx->fuv,  *tb = bottom_vtx->fuv;
+    vec2f *mt = top_vtx->fuv2, *mm = mid_vtx->fuv2, *mb = bottom_vtx->fuv2;
+
+    // prepare texture coordinates
+    int32_t scale_u = 256;
+    int32_t scale_v = 256;
+    for (int vtx = 0; vtx < vtxcount; vtx++) {
+        tmap_texcoord[vtx].x = (f[vtx].fuv->x * scale_u);
+        tmap_texcoord[vtx].y = (f[vtx].fuv->y * scale_v);
+        f[vtx].fuv = tmap_texcoord + vtx;
+    }
+
+    // calculate gradients
+    grad.dudx  = (int32_t)((((tb->x - tt->x) * mid_t) + (tt->x - tm->x)) * inv_width_64k * scale_u);
+    grad.dvdx  = (int32_t)((((tb->y - tt->y) * mid_t) + (tt->y - tm->y)) * inv_width_64k * scale_v);
+
+    // add first two edges
+    mytmap_add_edge_uv_ffx(edge_lerp + 0, SIDE_LEFT,  top_vtx, left_vtx);
+    mytmap_add_edge_uv_ffx(edge_lerp + 1, SIDE_RIGHT, top_vtx, right_vtx);
+
+    // iterate along left and right edges, calculate section heights
+    int section_idx = 0;
+    tmap_edge_lerp_t *edge_left = edge_lerp + 0, *edge_right = edge_lerp + 1, *edge_cur = edge_lerp + 2;
+    int left_height = edge_left->height, right_height = edge_right->height;
+    while (((left_vtx != bottom_vtx) || (right_vtx != bottom_vtx)) && (section_idx < vtxcount)) {
+        if (left_height < right_height) {
+            // next edge is left, adjust left pointer
+            section_heights[section_idx++] = left_height;
+            right_height -= left_height;
+            // add new edge
+            tmap_vtx_uv_t *prev_vtx = left_vtx;
+            if (left_vtx != bottom_vtx) {
+                left_vtx++; if (left_vtx > end_vtx) left_vtx = start_vtx;
+                mytmap_add_edge_uv_ffx(edge_cur, SIDE_LEFT, prev_vtx, left_vtx);
+                edge_left = edge_cur++;
+                left_height = edge_left->height;
+            }
+        } else {
+            // next edge is right, adjust right pointer
+            section_heights[section_idx++] = right_height;
+            left_height -= right_height;
+            // add new edge
+            tmap_vtx_uv_t *prev_vtx = right_vtx;
+            if (right_vtx != bottom_vtx) {
+                right_vtx--; if (right_vtx < start_vtx) right_vtx = end_vtx;
+                mytmap_add_edge_uv_ffx(edge_cur, SIDE_RIGHT, prev_vtx, right_vtx);
+                edge_right = edge_cur++;
+                right_height = edge_right->height;
+            }
+        }
+    }
+    // set last section height
+    section_heights[section_idx++] = (left_height < right_height) ? left_height : right_height;
+
+    // get display start
+    uint8_t* dst_start = mytmap_dst + ((top_vtx->cy) * mytmap_pitch);
+
+    // call common filler
+    grad.texture16  = tex;
+    grad.uvmask     = 0xFFFF;
+#ifdef USE_INTERP
+    MYTMAP_INTERP_TEXTURE->base[0] = grad.dudx;
+    MYTMAP_INTERP_TEXTURE->base[1] = grad.dvdx;
+#endif
+    mytmap_draw_sections_affine_uv_16(dst_start, section_idx, section_heights, edge_lerp);
+}
+
+
+
+
 
 // multitexture, 16bpp
 void mytmap_draw_tri_multitex_16(tmap_vtx_uv_t *f, uint8_t *tex, uint8_t *tex2, uint16_t *blend) {
