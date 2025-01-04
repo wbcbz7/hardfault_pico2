@@ -18,6 +18,10 @@
 
 #include "../textures/owl.h"
 
+#include "../textures/env_tex.h"
+#include "../textures/env_envmap.h"
+#include "../textures/env_blendtab.h"
+
 enum {
     MAX_VERTICES            = 500,
     MAX_NORMALS             = 500,
@@ -27,10 +31,10 @@ enum {
 
 // face sorting struct
 static face_sort_t *facesort;//[MAX_FACES];
-static face_sort_t *facesort_tmp;//[MAX_FACES];
 
-// transformed vertices storage
+// transformed vertices/normals storage
 static vec3f *vt;//[MAX_VERTICES];
+static vec3f *nt;//[MAX_NORMALS];
 
 // gouraud shading table
 static uint16_t shadetab[2][256];
@@ -38,8 +42,8 @@ static uint16_t shadetab[2][256];
 void test3d_init()
 {
     vt = new vec3f[MAX_VERTICES];
+    nt = new vec3f[MAX_NORMALS];
     facesort = new face_sort_t[MAX_FACES];
-    facesort_tmp = new face_sort_t[MAX_FACES];
 
     // calculate shading table
     argb32 c0, c1;
@@ -59,8 +63,8 @@ void test3d_init()
 void test3d_done()
 {
     delete[] vt;
+    delete[] nt;
     delete[] facesort;
-    delete[] facesort_tmp;
 }
 
 void test3d_run()
@@ -117,6 +121,12 @@ void test3d_run()
             vt[i].z = rz * (1.0f / FOV);
         }
         vtx_pos += obj->total_pos;
+        for (int i = 0; i < obj->total_normals; i++) {
+            // go straight to texture coordinates lol
+            vec3f n; mulrs(n, obj->n[i], view);
+            nt[i].x = ((n.x + 1))* 0.5f;
+            nt[i].y = ((n.y + 1))*-0.5f;
+        }
         rasterdot(argb_to_555(255, 0, 0));
 
 #if 1
@@ -140,15 +150,15 @@ void test3d_run()
             faces_to_draw = fs - facesort;
         }
         face_sort(facesort, faces_to_draw);
-        //face_sort_radix(facesort, facesort_tmp, faces_to_draw);
 #endif
         rasterdot(argb_to_555(255, 0, 255));
 
-                // setup HW interpolators
+        // setup HW interpolators
 #if 0
         mytmap_interp_setup_l_2x2(MYTMAP_INTERP_SHADETAB, shadetab, 16, 8, 0, 1);
 #else
-        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE, shadetab, 16, 8, 8, 1);
+        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE,  env_texture, 16, 8, 8, 0);
+        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE2, env_envmap,  16, 8, 8, 0);
 #endif
 
 #if 1
@@ -179,7 +189,7 @@ void test3d_run()
                 default:    mytmap_draw_poly_flat_16(ff, poly_count, color); break;
             } 
 #endif
-#if 1
+#if 0
             // texture mapping
             mytmap_interp_set_texture(MYTMAP_INTERP_TEXTURE, texture_owl);
             {
@@ -206,6 +216,30 @@ void test3d_run()
                 case 3:     mytmap_draw_tri_gouraud_16 (ff, shadetab[objf->mat]); break;
                 default:    mytmap_draw_poly_gouraud_16(ff, poly_count, shadetab[objf->mat]); break;
             } 
+#endif
+#if 1
+            // environment mapping!
+            vec2f uv[3];
+            for (int vtx = 0; vtx < objf->length; vtx++) {
+                ff[vtx].fuv2 = (vec2f*)&nt[idx[vtx].n];
+            }
+            int poly_count = clippoly(ff, 3, CLIP_BOUNDARY_MASK | CLIP_FLAGS_UV | CLIP_FLAGS_UV2, &bbox);
+            switch(poly_count) {
+                case 0: case 1: case 2: break;
+                case 3:     mytmap_draw_tri_multitex_16 (
+                    ff,
+                    (uint8_t*) env_texture,
+                    (uint8_t*) env_envmap,
+                    (uint16_t*)env_blendtab
+                ); break;
+                default:    mytmap_draw_poly_multitex_16(
+                    ff,
+                    poly_count,
+                    (uint8_t*) env_texture,
+                    (uint8_t*) env_envmap,
+                    (uint16_t*)env_blendtab
+                ); break;
+            }
 #endif
             fs++;
         }

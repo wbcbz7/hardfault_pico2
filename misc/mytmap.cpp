@@ -113,7 +113,7 @@ void mytmap_polydraw_init(void *buf, int pitch) {
 // ------------------------------------
 // setup interpolators for 16.16 fixedpoint operation
 // bit_bias shifts result to the left (for halfword/word tables)
-void mytmap_interp_setup_l(interp_hw_t *interp, void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
+void mytmap_interp_setup_l(interp_hw_t *interp, const void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
     interp_config cfg = interp_default_config();
     interp_config_set_add_raw(&cfg, true);
 
@@ -129,7 +129,7 @@ void mytmap_interp_setup_l(interp_hw_t *interp, void *texture, uint32_t fract_bi
     interp->base[2] = (uintptr_t) texture;
 }
 
-void mytmap_interp_setup_l_2x2(interp_hw_t *interp, void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
+void mytmap_interp_setup_l_2x2(interp_hw_t *interp, const void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
     interp_config cfg = interp_default_config();
     interp_config_set_add_raw(&cfg, true);
 
@@ -148,7 +148,7 @@ void mytmap_interp_setup_l_2x2(interp_hw_t *interp, void *texture, uint32_t frac
     interp->base[2] = (uintptr_t) texture;
 }
 
-void mytmap_interp_setup_uv(interp_hw_t *interp, void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
+void mytmap_interp_setup_uv(interp_hw_t *interp, const void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
     interp_config cfg = interp_default_config();
     interp_config_set_add_raw(&cfg, true);
 
@@ -554,7 +554,49 @@ static int mytmap_add_edge_multiuv_ffx(tmap_edge_lerp_t *edge, int32_t side, tma
     return height;
 }
 
-static void mytmap_draw_sections_affine_multiuv_16(uint8_t *dst, int sections, int32_t *heights, tmap_edge_lerp_t *edges) {
+#ifdef USE_INTERP
+static void __not_in_flash_func(mytmap_draw_sections_affine_multiuv_16)(uint8_t *dst, int sections, int32_t *heights, tmap_edge_lerp_t *edges) {
+    // common tmap code here
+    tmap_edge_lerp_t *left = edge_lerp + 0, *right = edge_lerp + 1, *next_edge = edge_lerp + 2;
+
+    // draw polygon sections
+    do {
+        int lines = *heights++;
+        if (lines > 0) do {
+            int32_t start   = ceilx(left->x);
+            int32_t width   = ceilx(right->x) - start;
+            int32_t prestep = (-left->x)&0xFFFF;
+            int32_t u  = left->u  + imul16(prestep, grad.dudx);
+            int32_t v  = left->v  + imul16(prestep, grad.dvdx);
+            int32_t u2 = left->u2 + imul16(prestep, grad.du2dx);
+            int32_t v2 = left->v2 + imul16(prestep, grad.dv2dx);
+            MYTMAP_INTERP_TEXTURE ->accum[0] = u;
+            MYTMAP_INTERP_TEXTURE ->accum[1] = v;
+            MYTMAP_INTERP_TEXTURE2->accum[0] = u2;
+            MYTMAP_INTERP_TEXTURE2->accum[1] = v2;
+            uint16_t *p = (uint16_t*)dst + start;
+            if (width > 0) do {
+                *p++ = grad.blendtab16[
+                    ((uint32_t)(*(const uint8_t*)MYTMAP_INTERP_TEXTURE ->pop[2])<<0) | 
+                    ((uint32_t)(*(const uint8_t*)MYTMAP_INTERP_TEXTURE2->pop[2])<<8)
+                ];
+            } while (--width);
+            left->x  += left->dxdy;
+            right->x += right->dxdy;
+            left->u  += left->dudy;
+            left->v  += left->dvdy;
+            left->u2 += left->du2dy;
+            left->v2 += left->dv2dy;
+            dst += mytmap_pitch;
+        } while (--lines);
+
+        // switch to next section
+        next_edge->side ? right = next_edge : left = next_edge;
+        next_edge++;
+    } while (--sections);
+}
+#else
+static void __not_in_flash_func(mytmap_draw_sections_affine_multiuv_16)(uint8_t *dst, int sections, int32_t *heights, tmap_edge_lerp_t *edges) {
     // common tmap code here
     tmap_edge_lerp_t *left = edge_lerp + 0, *right = edge_lerp + 1, *next_edge = edge_lerp + 2;
 
@@ -593,6 +635,7 @@ static void mytmap_draw_sections_affine_multiuv_16(uint8_t *dst, int sections, i
         next_edge++;
     } while (--sections);
 }
+#endif
 
 // -------------------------------------------
 
@@ -1260,6 +1303,12 @@ void mytmap_draw_tri_multitex_16(tmap_vtx_uv_t *f, uint8_t *tex, uint8_t *tex2, 
     grad.blendtab16 = blend;
     grad.uvmask     = 0xFFFF;
     grad.uvmask2    = 0xFFFF;
+#ifdef USE_INTERP
+    MYTMAP_INTERP_TEXTURE ->base[0] = grad.dudx;
+    MYTMAP_INTERP_TEXTURE ->base[1] = grad.dvdx;
+    MYTMAP_INTERP_TEXTURE2->base[0] = grad.du2dx;
+    MYTMAP_INTERP_TEXTURE2->base[1] = grad.dv2dx;
+#endif
     mytmap_draw_sections_affine_multiuv_16(dst_start, 2, section_heights, edge_lerp);
 }
 
@@ -1373,8 +1422,14 @@ void mytmap_draw_poly_multitex_16(tmap_vtx_uv_t *f, uint32_t vtxcount, uint8_t *
     grad.blendtab16 = blend;
     grad.uvmask     = 0xFFFF;
     grad.uvmask2    = 0xFFFF;
+
+#ifdef USE_INTERP
+    MYTMAP_INTERP_TEXTURE ->base[0] = grad.dudx;
+    MYTMAP_INTERP_TEXTURE ->base[1] = grad.dvdx;
+    MYTMAP_INTERP_TEXTURE2->base[0] = grad.du2dx;
+    MYTMAP_INTERP_TEXTURE2->base[1] = grad.dv2dx;
+#endif
     mytmap_draw_sections_affine_multiuv_16(dst_start, section_idx, section_heights, edge_lerp);
 }
-
 
 }

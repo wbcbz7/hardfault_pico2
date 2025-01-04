@@ -7,6 +7,7 @@
 #include "hardware/structs/hstx_ctrl.h"
 #include "hardware/structs/hstx_fifo.h"
 #include "hardware/structs/sio.h"
+#include "hardware/interp.h"
 #include "pico/multicore.h"
 #include "pico/sem.h"
 #include "hardware/pll.h"
@@ -84,6 +85,10 @@ int main(void) {
     // reinit stdio
     stdio_init_all();
     printf("sysclk switch success\n");
+
+    // claim some of used HW
+    interp_claim_lane_mask(interp0, 3);
+    interp_claim_lane_mask(interp1, 3); // claim both interpolators since they are used for texture mapping
 
     // alloc queues
     queue_init(&multicore_queue_msg,  sizeof(queue_msg_t), 2);
