@@ -15,6 +15,7 @@
 #include <timer.h>
 
 #include "../objects/duck3ds.h"
+#include "../objects/torus2.h"
 
 #include "../textures/owl.h"
 
@@ -69,7 +70,8 @@ void test3d_done()
 
 void test3d_run()
 {
-    const incobj_t *obj = duck3ds_object;
+    //const incobj_t *obj = duck3ds_object;
+    const incobj_t *obj = torus2_object;
 
     static const float FOV = 160.0f;
     static vec4f bbox = {.x = 0, .y = 0, .z = X_RES-1, .w = Y_RES-1};
@@ -84,13 +86,13 @@ void test3d_run()
         fb_fill(&fb[fbIdx], 0, X_RES*Y_RES);
         rasterdot(argb_to_555(0, 0, 255));
         mytmap_polydraw_init(&fb[fbIdx], X_RES*BYTES_PER_PIXEL);
-#if 1
+#if 0
         vec3f cam = {0, 0.3, 2.6};
         mat4 view, view_inv;
         mat4 m_rot; rot4(m_rot, 0.3*sin(t*1.2), t*0.9, 0.0);
         mat4 m_ofs; ofs4(m_ofs, cam.x, cam.y, cam.z);
 #else
-        vec3f cam = {1*sin(t*0.7), 1*sin(t*0.6), 2.6};
+        vec3f cam = {1.0f*sin(t*0.7), 1.0f*sin(t*0.6), 2.6f};
         //vec3f cam = {0, 0, 2.6};
         mat4 view, view_inv;
 

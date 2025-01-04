@@ -53,6 +53,7 @@ add_executable(dh2025w_demo
 
         parts/test3d.cpp
         parts/linetunnel.cpp
+        parts/bmpdist.cpp
 )
 
 pico_generate_pio_header(dh2025w_demo ${CMAKE_CURRENT_LIST_DIR}/dvi.pio)
@@ -61,9 +62,11 @@ pico_generate_pio_header(dh2025w_demo ${CMAKE_CURRENT_LIST_DIR}/i2s.pio)
 target_include_directories(dh2025w_demo PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/images
-	${CMAKE_CURRENT_LIST_DIR}/parts
-	${CMAKE_CURRENT_LIST_DIR}/misc
+        ${CMAKE_CURRENT_LIST_DIR}/parts
+        ${CMAKE_CURRENT_LIST_DIR}/misc
 )
+
+target_compile_options(dh2025w_demo PUBLIC -ffast-math -funsafe-math-optimizations)
 
 pico_enable_stdio_uart(dh2025w_demo 1)
 pico_enable_stdio_usb(dh2025w_demo 0)

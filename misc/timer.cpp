@@ -23,3 +23,9 @@ void rasterdot(uint32_t color) {
     }
 }
 
+void rasterdot_xor(uint32_t color) {
+    int32_t scanline = dvi_get_current_active_scanline() / 2;
+    if (scanline >= 0 && scanline < Y_RES-1) {
+        fb[fbIdx^1][(scanline+1)*X_RES] ^= color;
+    }
+}
