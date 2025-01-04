@@ -321,6 +321,7 @@ int dvi_get_current_state();
 // get current scanline and frame, leading by 2 scanlines due to DMA sequencing logic
 uint32_t dvi_get_frame_count();
 uint32_t dvi_get_current_scanline();
+int32_t dvi_get_current_active_scanline();
 
 #ifdef __cplusplus
 }

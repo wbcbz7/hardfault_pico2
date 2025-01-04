@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <defs.h>
 #include "vec.h"
 #include "fxmath.h"
 #include "mytmap.h"
@@ -242,7 +243,7 @@ static int mytmap_add_edge_uv_ffx(tmap_edge_lerp_t *edge, int32_t side, tmap_vtx
 }
 
 #if 0
-static void mytmap_draw_sections_affine_l_16(uint8_t *dst, int sections, int start_y, int *heights, tmap_edge_lerp_t *edges) {
+static void __not_in_flash_func(mytmap_draw_sections_affine_l_16)(uint8_t *dst, int sections, int start_y, int32_t *heights, tmap_edge_lerp_t *edges) {
     // common tmap code here
     tmap_edge_lerp_t *left = edge_lerp + 0, *right = edge_lerp + 1, *next_edge = edge_lerp + 2;
 
@@ -272,7 +273,7 @@ static void mytmap_draw_sections_affine_l_16(uint8_t *dst, int sections, int sta
 }
 #else
 // with 2x2 dithering
-static void mytmap_draw_sections_affine_l_16(uint8_t *dst, int sections, int start_y, int32_t *heights, tmap_edge_lerp_t *edges) {
+static void __not_in_flash_func(mytmap_draw_sections_affine_l_16)(uint8_t *dst, int sections, int start_y, int32_t *heights, tmap_edge_lerp_t *edges) {
     // common tmap code here
     tmap_edge_lerp_t *left = edge_lerp + 0, *right = edge_lerp + 1, *next_edge = edge_lerp + 2;
 

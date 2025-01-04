@@ -12,12 +12,25 @@
 #define max(a, b)      ((a) > (b) ? (a) : (b))
 #endif
 
+#ifndef sgn
 #define sgn(a)         ((a) < (0) ? (-1) : ((a) > (0) ? (1) : (0)))
-#define clamp(a, l, h) ((a) > (h) ? (h) : ((a) < (l) ? (l) : (a)))
+#endif
 
+#ifndef clamp
+#define clamp(a, l, h) ((a) > (h) ? (h) : ((a) < (l) ? (l) : (a)))
+#endif
+
+#ifndef ee
 #define ee 10E-8
+#endif
+
+#ifndef sqr
 #define sqr(a) ((a)*(a))
+#endif
+
+#ifndef pi
 #define pi 3.141592653589793f
+#endif
 
 // upside-down implementation of smoothstep()
 inline float smoothstep(float edge0, float edge1, float x) {

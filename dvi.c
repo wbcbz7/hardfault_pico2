@@ -795,6 +795,10 @@ uint32_t __not_in_flash_func(dvi_get_current_scanline)() {
     return *(volatile int*)&v_ctx.irq_sm.scanline;
 }
 
+int32_t __not_in_flash_func(dvi_get_current_active_scanline)() {
+    return *(volatile int*)&v_ctx.irq_sm.scanline - (v_ctx.irq_sm.active_end - v_ctx.timings.v.active);
+}
+
 // check if bus error occured
 int dvi_is_bus_error() {
     return (v_ctx.bus_error.num != -1) ? true : false;

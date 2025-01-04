@@ -16,6 +16,8 @@
 #include <math.h>
 #include <string.h>
 
+#include <algorithm>    // for std::sort()
+
 #include "dvi.h"
 #include "defs.h"
 #include "core1.h"

@@ -42,14 +42,16 @@ add_executable(dh2025w_demo
         main.cpp
         dvi.c
         lxmplay.cpp
-	core1.cpp
+        core1.cpp
 
-	misc/fbstuff.cpp
+        misc/fbstuff.cpp
         misc/linedraw.cpp
         misc/2dclip.cpp
+        misc/facesort.cpp
         misc/mytmap.cpp
         misc/palerp.cpp
-        
+        misc/timer.cpp
+
         parts/test3d.cpp
         parts/linetunnel.cpp
 )
@@ -76,6 +78,7 @@ target_link_libraries(dh2025w_demo
         hardware_pll
         hardware_vreg
         hardware_clocks
+        hardware_interp
         hardware_gpio
         pico_sync
         pico_util

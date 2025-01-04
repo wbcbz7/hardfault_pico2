@@ -7,6 +7,7 @@
 #include <argb.h>
 #include <mytmap.h>
 #include <2dclip.h>
+#include <facesort.h>
 #include <matrix.h>
 #include <incobj.h>
 #include <string.h>
@@ -21,16 +22,9 @@ enum {
     MAX_FACES               = 650,
 };
 
-struct face_sort_t {
-    uint32_t depth;
-    const incobj_face_t *face;
-};
-static int facesort_func(const void *a, const void *b) {
-    return ((const face_sort_t*)a)->depth - ((const face_sort_t*)b)->depth;
-}
-
 // face sorting struct
 static face_sort_t *facesort;//[MAX_FACES];
+static face_sort_t *facesort_tmp;//[MAX_FACES];
 
 // transformed vertices storage
 static vec3f *vt;//[MAX_VERTICES];
@@ -42,6 +36,7 @@ void test3d_init()
 {
     vt = new vec3f[MAX_VERTICES];
     facesort = new face_sort_t[MAX_FACES];
+    facesort_tmp = new face_sort_t[MAX_FACES];
 
     // calculate shading table
     argb32 c0, c1;
@@ -56,6 +51,13 @@ void test3d_init()
     c0.r=40; c0.g=40+4; c0.b=40+2; c1.r=255; c1.g=255, c1.b=255;
     pal_lerp_single_rgb555_256(shadetab[0], c0, c1);
 #endif
+}
+
+void test3d_done()
+{
+    delete[] vt;
+    delete[] facesort;
+    delete[] facesort_tmp;
 }
 
 void test3d_run()
@@ -132,7 +134,8 @@ void test3d_run()
             }
             faces_to_draw = fs - facesort;
         }
-        qsort(facesort, faces_to_draw, sizeof(face_sort_t), facesort_func);
+        face_sort(facesort, faces_to_draw);
+        //face_sort_radix(facesort, facesort_tmp, faces_to_draw);
 #endif
 
 #if 1
@@ -191,15 +194,16 @@ void test3d_run()
             vp++;
         }
 #endif
-
+        // draw "rasterbar"
+        {
+            int scanline = dvi_get_current_active_scanline() / 2;
+            if (scanline >= 0 && scanline < Y_RES-1) {
+                fb[fbIdx^1][(scanline+1)*X_RES] = 0x7FFF;
+            }
+            
+        }
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
         dvi_wait_for_vblank();
         frame_counter++;
     }
-}
-
-void test3d_done()
-{
-    delete[] vt;
-    delete[] facesort;
 }

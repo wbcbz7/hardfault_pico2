@@ -314,6 +314,6 @@ void __scratch_y("") core1_task() {
         queue_add_blocking(&multicore_queue_resp, &resp);
 #endif
         // foreground tasks
-        sleep_us(100);      // give some chance for core0 to acquire lock
+        //sleep_us(100);      // give some chance for core0 to acquire lock
     }
 }
