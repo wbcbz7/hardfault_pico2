@@ -18,7 +18,7 @@ enum {
     MAX_VERTICES            = 500,
     MAX_NORMALS             = 500,
     MAX_VERTICES_PER_TRI    = 10,
-    MAX_FACES               = 400,
+    MAX_FACES               = 650,
 };
 
 struct face_sort_t {
@@ -66,7 +66,6 @@ void test3d_run()
     static vec4f bbox = {.x = 0, .y = 0, .z = X_RES-1, .w = Y_RES-1};
 
     // calculate shading table
-
 
     fbIdx = 0;
     uint32_t frame_counter = 0;

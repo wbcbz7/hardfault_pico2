@@ -45,7 +45,8 @@
         "640x480_rgb332.h": "c",
         "resets.h": "c",
         "math.h": "c",
-        "claim.h": "c"
+        "claim.h": "c",
+        "cstdint": "cpp"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }
