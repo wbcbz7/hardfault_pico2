@@ -155,4 +155,6 @@ int lxm_tick(lxm_context_t* ctx);
 // returns sample frames rendered or 0 if error
 int lxm_render(lxm_context_t* ctx, int16_t* buf, int32_t count);
 
+// return current frame counter
+int lxm_current_frame();
 

@@ -28,6 +28,11 @@
 #include "parts/test3d.h"
 #include "parts/bmpdist.h"
 #include "parts/tunnel.h"
+#include "parts/bgmap.h"
+
+#include <fbstuff.h>
+#include <argb.h>
+#include <timer.h>
 
 // LED blinker in case of errors
 void blink_led_hang() {
@@ -115,6 +120,14 @@ int main(void) {
         blink_led_hang();
     }
 
+    // clear framebuffer, wait 4 seconds to wakeup
+    fb_fill_a(fb[fbIdx], argb_to_555(32, 8, 8), X_RES*Y_RES);
+    sleep_ms(3*1000);
+    fb_fill_a(fb[fbIdx], argb_to_555(8, 8, 32), X_RES*Y_RES);
+    sleep_ms(2*1000);
+    fb_fill_a(fb[fbIdx], argb_to_555(32, 32, 32), X_RES*Y_RES);
+    sleep_ms(5*1000);
+
 #if 0
     // start audio
     queue_post_msg(CORE1_MSG_START_MUSIC, 0);
@@ -123,22 +136,34 @@ int main(void) {
         blink_led_hang();
     }
 #endif
-    
-#if 1
+
+#if 0
+    bgmap_init();
+    ftimer_set(0.0);
+    bgmap_run();
+    bgmap_done();
+#endif
+#if 0
     test3d_init();
+    ftimer_set(0.0);
     test3d_run();
     test3d_done();
 #endif
 #if 0
+    linetunnel_init();
+    ftimer_set(0.0);
     linetunnel_run();
+    linetunnel_done();
 #endif
-#if 0
+#if 1
     bmpdist_init();
+    ftimer_set(0.0);
     bmpdist_run();
     bmpdist_done();
 #endif
 #if 0
     tunnel_init();
+    ftimer_set(0.0);
     tunnel_run();
     tunnel_done();
 #endif

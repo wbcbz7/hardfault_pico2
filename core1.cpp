@@ -111,6 +111,9 @@ int audio_callback_irq  = FIRST_USER_IRQ;
 lxm_context_t lxm_ctx;
 #define LXMPLAY_TEST
 
+// boooooo!
+int lxm_current_frame() { return lxm_ctx.pos.frame; }
+
 // render audio
 __attribute__((noinline))
 void __not_in_flash_func(audio_render)(int16_t *dst, uint32_t frames, uint32_t timestamp) {

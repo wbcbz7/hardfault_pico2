@@ -56,6 +56,8 @@ add_executable(dh2025w_demo
         parts/linetunnel.cpp
         parts/bmpdist.cpp
         parts/tunnel.cpp
+        parts/bgmap.cpp
+        parts/bgmap_a.S
 )
 
 pico_generate_pio_header(dh2025w_demo ${CMAKE_CURRENT_LIST_DIR}/dvi.pio)
