@@ -83,7 +83,7 @@ void test3d_run()
 
     while(1) {
         float t = frame_counter / 60.0f;
-        fb_fill(&fb[fbIdx], 0, X_RES*Y_RES);
+        fb_fill_a(&fb[fbIdx], 0, X_RES*Y_RES);
         rasterdot(argb_to_555(0, 0, 255));
         mytmap_polydraw_init(&fb[fbIdx], X_RES*BYTES_PER_PIXEL);
 #if 0
@@ -92,7 +92,7 @@ void test3d_run()
         mat4 m_rot; rot4(m_rot, 0.3*sin(t*1.2), t*0.9, 0.0);
         mat4 m_ofs; ofs4(m_ofs, cam.x, cam.y, cam.z);
 #else
-        vec3f cam = {1.0f*sin(t*0.7), 1.0f*sin(t*0.6), 2.6f};
+        vec3f cam = {1.0f*sin(t*0.7f), 1.0f*sin(t*0.6f), 2.6f};
         //vec3f cam = {0, 0, 2.6};
         mat4 view, view_inv;
 

@@ -40,10 +40,10 @@ struct grid_t {
 };
 
 // texture storage (copied upon part init)
-uint16_t *texsram;
+static uint16_t *texsram;
 
 // grid lerp storage
-grid_t *grid;
+static grid_t *grid;
 
 
 void bmpdist_init() {

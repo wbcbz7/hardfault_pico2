@@ -33,6 +33,7 @@ void mytmap_polydraw_init(void *buf, int pitch);
 
 // init tmap interpolators
 void mytmap_interp_setup_l    (interp_hw_t *interp, const void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias);
+void mytmap_interp_setup_lsh  (interp_hw_t *interp, const void *texture, uint32_t fract_bits, uint32_t shade_bits, uint32_t texel_bits, uint32_t bit_bias);
 void mytmap_interp_setup_l_2x2(interp_hw_t *interp, const void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias);
 void mytmap_interp_setup_uv   (interp_hw_t *interp, const void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias);
 #ifdef PICO_BUILD

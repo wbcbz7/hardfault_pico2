@@ -44,6 +44,7 @@ add_executable(dh2025w_demo
         core1.cpp
 
         misc/fbstuff.cpp
+        misc/fbstuff_a.S
         misc/linedraw.cpp
         misc/2dclip.cpp
         misc/facesort.cpp
@@ -54,6 +55,7 @@ add_executable(dh2025w_demo
         parts/test3d.cpp
         parts/linetunnel.cpp
         parts/bmpdist.cpp
+        parts/tunnel.cpp
 )
 
 pico_generate_pio_header(dh2025w_demo ${CMAKE_CURRENT_LIST_DIR}/dvi.pio)

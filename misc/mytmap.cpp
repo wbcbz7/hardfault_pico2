@@ -129,6 +129,25 @@ void mytmap_interp_setup_l(interp_hw_t *interp, const void *texture, uint32_t fr
     interp->base[2] = (uintptr_t) texture;
 }
 
+void mytmap_interp_setup_lsh(interp_hw_t *interp, const void *texture, uint32_t fract_bits, uint32_t shade_bits, uint32_t texel_bits, uint32_t bit_bias) {
+    interp_config cfg = interp_default_config();
+    interp_config_set_add_raw(&cfg, true);
+
+    // setup lane 0 (shade lane)
+    interp_config_set_shift(&cfg, (fract_bits - texel_bits - bit_bias) & 31);
+    interp_config_set_mask(&cfg, bit_bias + texel_bits, bit_bias + texel_bits + shade_bits - 1);
+    interp_set_config(interp, 0, &cfg);
+
+    // setup lane 1 (texel lane)
+    interp_config_set_shift(&cfg, (-bit_bias) & 31);
+    interp_config_set_mask(&cfg, bit_bias, bit_bias + texel_bits - 1);
+    interp_set_config(interp, 1, &cfg);
+    interp->base[1] = 0;
+
+    // setup lane 2 (texture pointer)
+    interp->base[2] = (uintptr_t) texture;
+}
+
 void mytmap_interp_setup_l_2x2(interp_hw_t *interp, const void *texture, uint32_t fract_bits, uint32_t width_bits, uint32_t height_bits, uint32_t bit_bias) {
     interp_config cfg = interp_default_config();
     interp_config_set_add_raw(&cfg, true);

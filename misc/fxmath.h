@@ -37,6 +37,10 @@ inline float smoothstep(float edge0, float edge1, float x) {
   return (edge0 + (x * x * (3 - 2 * x)) * (edge1 - edge0));
 }
 
+inline float mix(float edge0, float edge1, float x) {
+  return (edge0 + x * (edge1 - edge0));
+}
+
 /*
 long abs(long a);
 #pragma aux abs = \

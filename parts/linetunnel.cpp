@@ -6,6 +6,7 @@
 #include <defs.h>
 #include <argb.h>
 #include <linedraw.h>
+#include <timer.h>
 
 enum {
     TOTAL_LINES = 5,
@@ -34,8 +35,9 @@ void linetunnel_run()
     // init palette
     uint16_t linepal[16];
     argb32 bgcolor;   bgcolor.r   = 0x18, bgcolor.g   = 0x18, bgcolor.b   = 0x60;
+    argb32 bgcolor2;  bgcolor2.r  = 0x08, bgcolor2.g  = 0x08, bgcolor2.b  = 0x30;
     argb32 linecolor; linecolor.r = 0xD0, linecolor.g = 0xD0, linecolor.b = 0xFF;
-    uint32_t bgcolor16 = ((argb_to_555(bgcolor) | (argb_to_555(bgcolor) << 16)) >> 1) & 0x3DEF3DEF;
+    uint32_t bgcolor16 = argb_to_555(bgcolor2);
     {
         argb32 cc;
         for (int i = 0; i < 16; i++) {
@@ -48,7 +50,9 @@ void linetunnel_run()
 
     int total_segs = SEGS_PER_FRAME;
     while(1) {
-        fb_blend_const(&fb[fbIdx], bgcolor16, X_RES*Y_RES);
+        //fb_blend_const(&fb[fbIdx], bgcolor16, X_RES*Y_RES);
+        fb_blend_const_a(&fb[fbIdx], bgcolor16, X_RES*Y_RES);
+        rasterdot_xor(argb_to_555(0, 255, 255));
 
         const float SEG_DIST = 32.0;
         float fpos = frame_counter * 4;
@@ -104,7 +108,7 @@ void linetunnel_run()
                 );
             }
         }
-
+        rasterdot_xor(argb_to_555(255, 255, 255));
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
         dvi_wait_for_vblank();
         frame_counter++;
