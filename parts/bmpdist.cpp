@@ -189,7 +189,7 @@ void bmpdist_run() {
     // init interpolators
     mytmap_interp_setup_uv(INTERP_TEXTURE, texture, 16, 8, 8, 1);
 
-    while(lxm_current_frame() < (3*16 + 6*3*64)) {
+    while(lxm_current_frame() < (3*16 + 8*3*64)) {
         float t = frame_counter / 60.0f;
         // no need to clear buffer
 
@@ -197,7 +197,7 @@ void bmpdist_run() {
         drawgrid(fb[fbIdx], grid, texture);
 
         // fraw rasterdot and flip buffers
-        rasterdot_xor(argb_to_555(255, 255, 255));
+        //rasterdot_xor(argb_to_555(255, 255, 255));
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
         dvi_wait_for_vblank();
         frame_counter++;

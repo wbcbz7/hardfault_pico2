@@ -14,6 +14,7 @@
 #include <palerp.h>
 #include <timer.h>
 #include <kucha.h>
+#include <lxmplay.h>
 
 #ifdef PICO_BUILD
 #include "hardware/interp.h"
@@ -50,9 +51,10 @@ static grid_t *grid;
 
 
 void tunnel_init() {
-    texsram      = new uint8_t[256*256];
-    shadetabsram = new uint16_t[64*256];
-    grid = new grid_t[((Y_RES_GRID/GRID_SIZE)+1)*((X_RES_GRID/GRID_SIZE)+1)];
+    kucha_reset();
+    texsram      = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
+    shadetabsram = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(64*256));
+    grid = (grid_t*)kucha_alloc(sizeof(grid_t)*((Y_RES_GRID/GRID_SIZE)+1)*((X_RES_GRID/GRID_SIZE)+1));
 
     memcpy(texsram, tunnel_texture, sizeof(uint8_t)*256*256);
     memcpy(shadetabsram, tunnel_blendtab, sizeof(uint16_t)*64*256);
@@ -60,9 +62,7 @@ void tunnel_init() {
 
 void tunnel_done()
 {
-    delete[] texsram;
-    delete[] shadetabsram;
-    delete[] grid;
+    kucha_reset();
 }
 
 // ------------------
@@ -144,7 +144,7 @@ static void drawgrid(uint16_t *fb, grid_t *grid, const uint16_t* texture) {
     } 
 }
 
-static const float FOV = 160;
+static const float FOV = 140;
 static const float tunnel_size = 48.0f;
 
 void calcgrid(grid_t *grid, vec3f &o, vec3f &d, float t) {
@@ -169,7 +169,18 @@ void calcgrid(grid_t *grid, vec3f &o, vec3f &d, float t) {
     float aa = tunnel_size*tunnel_size * ((0.2f * cos(t * 0.4)) + 0.2f);
     //float aa = (size * size * 0.6);
 
-    float l0 = 32+31*sin(t*2.3), l1 = 32;
+    float l0 = 63, l1 = 32;
+
+    if (t < 1.0) {
+        l0 = 63;
+        l1 = smoothstep(63, 32, clamp(t, 0, 1));
+    }
+
+    if (t > 20.0f) {
+        float tt = (t - 20.0f)/2.0f;
+        l0 = smoothstep(63, 63, clamp(tt, 0, 1));
+        l1 = smoothstep(32, 63, clamp(tt, 0, 1));
+    }
 
     grid_t *p = grid;
     for (int y = 0; y < (Y_RES/GRID_SIZE)+1; y++) {
@@ -185,7 +196,6 @@ void calcgrid(grid_t *grid, vec3f &o, vec3f &d, float t) {
             norm(direction);
             direction = mul(direction, rot);
             
-#if 1
             float alt = aa * (cos(pi * (atan2(direction.y, direction.x)) + t));
             
             float a = (sqr(direction.x) + sqr(direction.y));
@@ -206,7 +216,6 @@ void calcgrid(grid_t *grid, vec3f &o, vec3f &d, float t) {
             // get uv
             fu = ((intersect.z) * 65536.0f * 1.0f);
             fv = ((fabs(atan2(intersect.y, intersect.x)) * 128.0f * 65536.0f * _1pi));
-#endif
             
             // get lighting
             float l = mix(l0, l1, clamp(30.0f / t, 0, 1));
@@ -224,7 +233,6 @@ void calcgrid(grid_t *grid, vec3f &o, vec3f &d, float t) {
 void tunnel_run() {
     const uint16_t *texture  = (const uint16_t *)texsram;
     const uint16_t *shadetab = (const uint16_t *)shadetabsram;
-    //const uint16_t *texture = bmpdist_texture;
 
     fbIdx = 0;
     uint32_t frame_counter = 0;
@@ -233,26 +241,25 @@ void tunnel_run() {
     mytmap_interp_setup_uv (INTERP_TEXTURE,  texture,  16, 8, 8, 0);
     mytmap_interp_setup_lsh(INTERP_SHADETAB, shadetab, 16, 6, 8, 1);
 
-    while(1) {
-        float t = frame_counter / 60.0f;
+    while(lxm_current_frame() < (3*16 + 12*3*64)) {
+        float t = ftimer_get();
         // no need to clear buffer
 
         vec3f o;
-        o.x = tunnel_size*0.3f*sin(t*1.6f) + tunnel_size*(0.5f * sin(t*0.73f));
+        o.x = tunnel_size*0.3f*sin(t*1.6f) + tunnel_size*(0.5f * sin(t*1.73f));
         o.y = tunnel_size*0.3f*cos(t*1.78f);
-        o.z = t * tunnel_size * 2.2f ;
+        o.z = t * tunnel_size * 3.2f ;
 
         vec3f dir;
-        dir.x = pi/4 + t*0.24f + 1.67f*cos(t*0.35f) + 0.45f*sin(t*0.6f);
-        dir.y = pi/2 + t*0.20f + 1.50f*sin(t*0.30f) + 0.41f*cos(t*0.5f);
+        dir.x = pi/4 + t*0.24f + 1.67f*cos(t*0.6f) + 0.45f*sin(t*0.9f);
+        dir.y = pi/2 + t*0.20f + 1.50f*sin(t*0.6f) + 0.41f*cos(t*0.9f);
         dir.z = pi/4 + 0.9f*sin(t*0.8f);
 
         calcgrid(grid, o, dir, t);
         drawgrid(fb[fbIdx], grid, texture);
         fb_blend_buf_a(&fb[fbIdx], &fb[fbIdx^1], X_RES*Y_RES);
 
-        // fraw rasterdot and flip buffers
-        rasterdot_xor(argb_to_555(255, 255, 255));
+        // draw rasterdot and flip buffers
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
         dvi_wait_for_vblank();
         frame_counter++;

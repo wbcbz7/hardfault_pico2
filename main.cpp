@@ -156,17 +156,17 @@ int main(void) {
     bmpdist_run();
     bmpdist_done();
 #endif
+#if 1
+    tunnel_init();
+    ftimer_set(0.0);
+    tunnel_run();
+    tunnel_done();
+#endif
 #if 0
     bgmap_init();
     ftimer_set(0.0);
     bgmap_run();
     bgmap_done();
-#endif
-#if 0
-    tunnel_init();
-    ftimer_set(0.0);
-    tunnel_run();
-    tunnel_done();
 #endif
 #if 1
     test3d_init();

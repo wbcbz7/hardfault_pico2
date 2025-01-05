@@ -53,7 +53,6 @@ void linetunnel_run()
     while(lxm_current_frame() < (3*16 + 4*3*64)) {
         //fb_blend_const(&fb[fbIdx], bgcolor16, X_RES*Y_RES);
         fb_blend_const_a(&fb[fbIdx], bgcolor16, X_RES*Y_RES);
-        rasterdot_xor(argb_to_555(0, 255, 255));
 
         const float SEG_DIST = 32.0;
         float fpos = frame_counter * 4;
@@ -61,8 +60,8 @@ void linetunnel_run()
         int fseg = fpos / SEG_DIST;
         int min_seg = max(20 - fseg, 0);
         
-#if 0
-        if ((frame_counter >= 400) && ((frame_counter&7) == 0)) {
+#if 1
+        if ((lxm_current_frame() >= (3*16 + 3*3*64 + 3*32)) && ((frame_counter&7) == 0)) {
             total_segs--;
         }
 #endif
