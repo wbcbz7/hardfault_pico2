@@ -51,6 +51,7 @@ add_executable(dh2025w_demo
         misc/mytmap.cpp
         misc/palerp.cpp
         misc/timer.cpp
+        misc/kucha.cpp
 
         parts/test3d.cpp
         parts/linetunnel.cpp

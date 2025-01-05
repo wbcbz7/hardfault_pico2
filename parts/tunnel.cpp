@@ -13,6 +13,7 @@
 #include <string.h>
 #include <palerp.h>
 #include <timer.h>
+#include <kucha.h>
 
 #ifdef PICO_BUILD
 #include "hardware/interp.h"

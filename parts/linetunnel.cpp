@@ -7,6 +7,7 @@
 #include <argb.h>
 #include <linedraw.h>
 #include <timer.h>
+#include <lxmplay.h>
 
 enum {
     TOTAL_LINES = 5,
@@ -49,7 +50,7 @@ void linetunnel_run()
     }
 
     int total_segs = SEGS_PER_FRAME;
-    while(1) {
+    while(lxm_current_frame() < (3*16 + 4*3*64)) {
         //fb_blend_const(&fb[fbIdx], bgcolor16, X_RES*Y_RES);
         fb_blend_const_a(&fb[fbIdx], bgcolor16, X_RES*Y_RES);
         rasterdot_xor(argb_to_555(0, 255, 255));
@@ -108,7 +109,7 @@ void linetunnel_run()
                 );
             }
         }
-        rasterdot_xor(argb_to_555(255, 255, 255));
+        //rasterdot_xor(argb_to_555(255, 255, 255));
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
         dvi_wait_for_vblank();
         frame_counter++;

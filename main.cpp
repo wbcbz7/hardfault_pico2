@@ -33,6 +33,7 @@
 #include <fbstuff.h>
 #include <argb.h>
 #include <timer.h>
+#include "lxmplay.h"
 
 // LED blinker in case of errors
 void blink_led_hang() {
@@ -124,11 +125,11 @@ int main(void) {
     fb_fill_a(fb[fbIdx], argb_to_555(32, 8, 8), X_RES*Y_RES);
     sleep_ms(3*1000);
     fb_fill_a(fb[fbIdx], argb_to_555(8, 8, 32), X_RES*Y_RES);
-    sleep_ms(2*1000);
+    //sleep_ms(2*1000);
     fb_fill_a(fb[fbIdx], argb_to_555(32, 32, 32), X_RES*Y_RES);
-    sleep_ms(5*1000);
+    //sleep_ms(5*1000);
 
-#if 0
+#if 1
     // start audio
     queue_post_msg(CORE1_MSG_START_MUSIC, 0);
     if ((resp = queue_get_resp(0)) != 0) {
@@ -137,6 +138,21 @@ int main(void) {
     }
 #endif
 
+    // PLACEHOLDER for another part needed
+    while (lxm_current_frame() < (3*16 + 2*3*64));
+
+#if 1
+    bmpdist_init();
+    linetunnel_init();
+    ftimer_set(0.0);
+    linetunnel_run();
+    linetunnel_done();
+#endif
+#if 1
+    ftimer_set(0.0);
+    bmpdist_run();
+    bmpdist_done();
+#endif
 #if 0
     bgmap_init();
     ftimer_set(0.0);
@@ -144,27 +160,17 @@ int main(void) {
     bgmap_done();
 #endif
 #if 0
-    test3d_init();
-    ftimer_set(0.0);
-    test3d_run();
-    test3d_done();
-#endif
-#if 0
-    linetunnel_init();
-    ftimer_set(0.0);
-    linetunnel_run();
-    linetunnel_done();
-#endif
-#if 1
-    bmpdist_init();
-    ftimer_set(0.0);
-    bmpdist_run();
-    bmpdist_done();
-#endif
-#if 0
     tunnel_init();
     ftimer_set(0.0);
     tunnel_run();
     tunnel_done();
 #endif
+#if 1
+    test3d_init();
+    ftimer_set(0.0);
+    test3d_run();
+    test3d_done();
+#endif
+
+    panic("end of demo. :p\n");
 }

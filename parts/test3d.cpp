@@ -13,6 +13,7 @@
 #include <string.h>
 #include <palerp.h>
 #include <timer.h>
+#include <kucha.h>
 
 #include "../objects/duck3ds.h"
 #include "../objects/torus2.h"
@@ -40,11 +41,25 @@ static vec3f *nt;//[MAX_NORMALS];
 // gouraud shading table
 static uint16_t shadetab[2][256];
 
+// texutre and envmap
+static uint8_t  *texture;
+static uint8_t  *envmap;
+static uint16_t *phongtab;
+
 void test3d_init()
 {
-    vt = new vec3f[MAX_VERTICES];
-    nt = new vec3f[MAX_NORMALS];
-    facesort = new face_sort_t[MAX_FACES];
+    kucha_reset();
+    vt = (vec3f*)kucha_alloc(sizeof(vec3f)*MAX_VERTICES);
+    nt = (vec3f*)kucha_alloc(sizeof(vec3f)*MAX_NORMALS);
+    facesort = (face_sort_t*)kucha_alloc(sizeof(face_sort_t)*MAX_FACES);
+
+    texture   = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
+    envmap    = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
+    phongtab  = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(64*256));
+
+    memcpy(texture, env_texture, sizeof(uint8_t)*256*256);
+    memcpy(envmap, env_envmap, sizeof(uint8_t)*256*256);
+    memcpy(phongtab, env_blendtab, sizeof(uint16_t)*64*256);
 
     // calculate shading table
     argb32 c0, c1;
@@ -63,9 +78,7 @@ void test3d_init()
 
 void test3d_done()
 {
-    delete[] vt;
-    delete[] nt;
-    delete[] facesort;
+    kucha_reset();
 }
 
 void test3d_run()
@@ -96,7 +109,7 @@ void test3d_run()
         //vec3f cam = {0, 0, 2.6};
         mat4 view, view_inv;
 
-        mat4 m_rot; rot4(m_rot, t*0.6, t*0.7, t*0.9);
+        mat4 m_rot; rot4(m_rot, t*1.4, t*1.2, t*1.4);
         //mat4 m_rot; rot4(m_rot, 0,0, t*0.9);
         mat4 m_ofs; ofs4(m_ofs, cam.x, cam.y, cam.z);
 #endif
@@ -159,8 +172,8 @@ void test3d_run()
 #if 0
         mytmap_interp_setup_l_2x2(MYTMAP_INTERP_SHADETAB, shadetab, 16, 8, 0, 1);
 #else
-        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE,  env_texture, 16, 8, 8, 0);
-        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE2, env_envmap,  16, 8, 8, 0);
+        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE,  texture, 16, 8, 8, 0);
+        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE2, envmap,  16, 8, 8, 0);
 #endif
 
 #if 1
@@ -230,16 +243,16 @@ void test3d_run()
                 case 0: case 1: case 2: break;
                 case 3:     mytmap_draw_tri_multitex_16 (
                     ff,
-                    (uint8_t*) env_texture,
-                    (uint8_t*) env_envmap,
-                    (uint16_t*)env_blendtab
+                    (uint8_t*) texture,
+                    (uint8_t*) envmap,
+                    (uint16_t*)phongtab
                 ); break;
                 default:    mytmap_draw_poly_multitex_16(
                     ff,
                     poly_count,
-                    (uint8_t*) env_texture,
-                    (uint8_t*) env_envmap,
-                    (uint16_t*)env_blendtab
+                    (uint8_t*) texture,
+                    (uint8_t*) envmap,
+                    (uint16_t*)phongtab
                 ); break;
             }
 #endif

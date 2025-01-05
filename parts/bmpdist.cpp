@@ -13,6 +13,8 @@
 #include <string.h>
 #include <palerp.h>
 #include <timer.h>
+#include <lxmplay.h>
+#include <kucha.h>
 
 #ifdef PICO_BUILD
 #include "hardware/interp.h"
@@ -45,18 +47,17 @@ static uint16_t *texsram;
 // grid lerp storage
 static grid_t *grid;
 
-
 void bmpdist_init() {
-    texsram = new uint16_t[256*256];
-    grid = new grid_t[((Y_RES_GRID/GRID_SIZE)+1)*((X_RES_GRID/GRID_SIZE)+1)];
+    kucha_reset();
+    texsram = (uint16_t*)kucha_alloc(256*256*sizeof(uint16_t));
+    grid    = (grid_t*)kucha_alloc(((Y_RES_GRID/GRID_SIZE)+1)*((X_RES_GRID/GRID_SIZE)+1)*sizeof(grid_t));
 
     memcpy(texsram, bmpdist_texture, sizeof(uint16_t)*256*256);
 }
 
 void bmpdist_done()
 {
-    delete[] texsram;
-    delete[] grid;
+    kucha_reset();
 }
 
 // ------------------
@@ -113,25 +114,41 @@ static void drawgrid(uint16_t *fb, grid_t *grid, const uint16_t* texture) {
     } 
 }
 
+const float endtime = 10.5f;
 
 static void calcgrid(grid_t *grid, float t) {
     mat2  rot; 
-    rot2(rot, t*0.6);
+    rot2(rot, t*1.0f + 0.4*sin(t*0.5f));
     vec2f direction;
 
-    float scale = 1.0f * (1.0f + 0.7f*sin(t*0.4f));
+    float firstscale;
+    if (t < 2.0f) {
+        float tt = t/2.0f;
+        tt = 1.0 - (1.0-tt)*(1.0-tt);
+        firstscale = clamp(1.0f*tt, 0, 1);
+    } else
+    if (t >= endtime-3.0f) {
+        float tt = (t - (endtime-3.0f))/3.0f;
+        tt = 1.0 - tt*tt;
+        firstscale = clamp(1.0f*tt, 0, 1);
+    }
+    else {
+        firstscale = 1.0f;
+    }
+
+    float scale = firstscale * (1.5f + 1.0f*sin(t*0.9f));
     float scale16f = 65536.0;
 
     float dirvec_scale = (float)Y_RES_GRID / ((float)X_RES_GRID);
     float dirvec_step = dirvec_scale*GRID_SIZE;
 
     grid_t *p = grid;
-    float distscale = 20.0f*sin(t*0.6f);
+    float distscale = firstscale*20.0f*sin(t*0.6f);
 
     vec2f disp;
     float dispradius = 200.0f;
-    disp.x = dispradius*sin(t*0.24f);
-    disp.y = dispradius*sin(t*0.24f);
+    disp.x = dispradius*sin(t*0.4f);
+    disp.y = dispradius*sin(t*0.4f);
 
     direction.y = -(Y_RES_GRID/2)*dirvec_scale;
     for (int y = 0; y < (Y_RES_GRID/GRID_SIZE)+1; y++) {
@@ -172,7 +189,7 @@ void bmpdist_run() {
     // init interpolators
     mytmap_interp_setup_uv(INTERP_TEXTURE, texture, 16, 8, 8, 1);
 
-    while(1) {
+    while(lxm_current_frame() < (3*16 + 6*3*64)) {
         float t = frame_counter / 60.0f;
         // no need to clear buffer
 

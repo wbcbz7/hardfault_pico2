@@ -21,8 +21,8 @@ typedef struct lxm_stream_stack_t {
 
 enum {
     LXMPLAY_MAX_STACK_DEPTH = 4,
-    LXMPLAY_MAX_CHANNELS    = 32,
-    LXMPLAY_MAX_SAMPLES     = 64,
+    LXMPLAY_MAX_CHANNELS    = 4,
+    LXMPLAY_MAX_SAMPLES     = 16,
 };
 
 typedef struct lxm_channel_context_t {
