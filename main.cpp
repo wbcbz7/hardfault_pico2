@@ -125,9 +125,9 @@ int main(void) {
     fb_fill_a(fb[fbIdx], argb_to_555(32, 8, 8), X_RES*Y_RES);
     sleep_ms(3*1000);
     fb_fill_a(fb[fbIdx], argb_to_555(8, 8, 32), X_RES*Y_RES);
-    //sleep_ms(2*1000);
+    sleep_ms(2*1000);
     fb_fill_a(fb[fbIdx], argb_to_555(32, 32, 32), X_RES*Y_RES);
-    //sleep_ms(5*1000);
+    sleep_ms(3*1000);
 
 #if 1
     // start audio
@@ -138,7 +138,10 @@ int main(void) {
     }
 #endif
 
+
+    while (lxm_current_frame() < (3*16));
     // PLACEHOLDER for another part needed
+    fb_fill_a(fb[fbIdx], argb_to_555(64, 64, 64), X_RES*Y_RES);
     while (lxm_current_frame() < (3*16 + 2*3*64));
 
 #if 1
