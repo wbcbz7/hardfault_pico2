@@ -36,7 +36,7 @@ void linetunnel_run()
     // init palette
     uint16_t linepal[16];
     argb32 bgcolor;   bgcolor.r   = 0x18, bgcolor.g   = 0x18, bgcolor.b   = 0x60;
-    argb32 bgcolor2;  bgcolor2.r  = 0x10, bgcolor2.g  = 0x10, bgcolor2.b  = 0x40;
+    argb32 bgcolor2;  bgcolor2.r  = 0x10, bgcolor2.g  = 0x10, bgcolor2.b  = 0x30;
     argb32 linecolor; linecolor.r = 0xD0, linecolor.g = 0xD0, linecolor.b = 0xFF;
     uint32_t bgcolor16 = argb_to_555(bgcolor2);
     {

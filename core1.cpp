@@ -69,6 +69,15 @@ static union dvi_hstx_pin_layout_t hstx_out_pins = {
     .lane2_n = 6, .lane2_p = 7,
 };
 #endif
+#ifdef HSTX_OUT_PICODVISOCK
+// Pico-DVI-Sock
+static union dvi_hstx_pin_layout_t hstx_out_pins = {
+    .clock_n = 15-12, .clock_p = 14-12,
+    .lane0_n = 13-12, .lane0_p = 12-12,
+    .lane1_n = 19-12, .lane1_p = 18-12,
+    .lane2_n = 17-12, .lane2_p = 16-12,
+};
+#endif
 
 // ----------------------------------------------------------------------------
 // audio stuff
