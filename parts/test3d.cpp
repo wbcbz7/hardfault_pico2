@@ -210,6 +210,7 @@ void test3d_run()
     //int deltalxm = (3*16);
 
     float t; volatile float ot = ftimer_get(); float dt;
+    dvi_wait_for_vblank();
     while(lxm_current_frame() < (deltalxm + 4*3*64)) {
         ot = t; t = ftimer_get(); dt = t - ot;
         {
@@ -235,7 +236,7 @@ void test3d_run()
             if (oo.y <= 0.0f) oo.y = 0.0f;
         }
         if ((lxmf > (deltalxm + 3*3*64 + 3*48)) && (lxmf < (deltalxm + 3*3*64 + 3*64))) {
-            oo.z -= dt*0.75f;
+            oo.z -= dt*0.7f;
         }
 
         state = lxmf < (deltalxm + 2*3*64) ? STATE_DUCK3DS : STATE_TORUS;

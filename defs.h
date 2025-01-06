@@ -14,7 +14,7 @@
 #define CLK_SYS_MUL          1
 
 // video mode pixel clock
-#define MODE_PIXEL_CLOCK     25*MHZ
+#define MODE_PIXEL_CLOCK     25200*KHZ
 
 // board define (TODO: do this via CMake)
 #define HSTX_OUT_MURMULATOR2

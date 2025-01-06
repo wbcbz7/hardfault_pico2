@@ -240,7 +240,7 @@ void tunnel_run() {
     // init interpolators
     mytmap_interp_setup_uv (INTERP_TEXTURE,  texture,  16, 8, 8, 0);
     mytmap_interp_setup_lsh(INTERP_SHADETAB, shadetab, 16, 6, 8, 1);
-
+    dvi_wait_for_vblank();
     while(lxm_current_frame() < (3*16 + 12*3*64)) {
         float t = ftimer_get();
         // no need to clear buffer
