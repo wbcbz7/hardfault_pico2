@@ -36,7 +36,7 @@ void linetunnel_run()
     // init palette
     uint16_t linepal[16];
     argb32 bgcolor;   bgcolor.r   = 0x18, bgcolor.g   = 0x18, bgcolor.b   = 0x60;
-    argb32 bgcolor2;  bgcolor2.r  = 0x08, bgcolor2.g  = 0x08, bgcolor2.b  = 0x30;
+    argb32 bgcolor2;  bgcolor2.r  = 0x10, bgcolor2.g  = 0x10, bgcolor2.b  = 0x40;
     argb32 linecolor; linecolor.r = 0xD0, linecolor.g = 0xD0, linecolor.b = 0xFF;
     uint32_t bgcolor16 = argb_to_555(bgcolor2);
     {
@@ -49,6 +49,7 @@ void linetunnel_run()
         }
     }
 
+    float lmod = 0.0, lmodc = 0.4;
     int total_segs = SEGS_PER_FRAME;
     while(lxm_current_frame() < (3*16 + 4*3*64)) {
         //fb_blend_const(&fb[fbIdx], bgcolor16, X_RES*Y_RES);
@@ -64,6 +65,12 @@ void linetunnel_run()
         if ((lxm_current_frame() >= (3*16 + 3*3*64 + 3*32)) && ((frame_counter&7) == 0)) {
             total_segs--;
         }
+        if (lxm_current_frame() >= (3*16 + 2*3*64)) {
+            lmod += 0.01f;
+            lmodc += 0.02f;
+            if (lmod > 0.5f) lmod = 0.5f;
+            if (lmodc > 0.8f) lmodc = 0.8f;
+        }
 #endif
 
         for (int seg = total_segs-1; seg >= min_seg; seg--) {
@@ -71,7 +78,7 @@ void linetunnel_run()
             segofs.x = sin((seg + fseg) * 0.3 + frame_counter * 0.04) * SEG_DIST * 1;
             segofs.y = cos((seg + fseg) * 0.2 + frame_counter * 0.04) * SEG_DIST * 1;
             float zz = fmod((-fpos), SEG_DIST) + (SEG_DIST * seg) + SEG_DIST + 10;
-            float length = 2 * pi * ((float)1 / TOTAL_LINES) * (1.0 + 0.4 * sin(frame_counter * 0.03));
+            float length = 2 * pi * ((float)1 / TOTAL_LINES) * (lmodc + lmod * sin(frame_counter * 0.03));
             float aa_seg_ofs = (frame_counter * 0.001) + 0.4*sin((fseg + seg) * 0.2 + frame_counter * 0.01);
             int col = min(15, 1250 / zz);
 

@@ -218,7 +218,7 @@ void test3d_run()
             uint32_t tabofs = (u & (TEXTURE_SIZE-1)) | ((v & (TEXTURE_SIZE-1)) << TEXTURE_SIZE_LOG2);
             bg_map(fb[fbIdx], tabofs);
         }
-        rasterdot(argb_to_555(0, 0, 255));
+        //rasterdot(argb_to_555(0, 0, 255));
         mytmap_polydraw_init(&fb[fbIdx], X_RES*BYTES_PER_PIXEL);
     
         int lxmf = lxm_current_frame();
@@ -296,7 +296,7 @@ void test3d_run()
             nt[i].x = ((n.x + 1))* 0.5f;
             nt[i].y = ((n.y + 1))*-0.5f;
         }
-        rasterdot(argb_to_555(255, 0, 0));
+        //rasterdot(argb_to_555(255, 0, 0));
 
 #if 1
         // do both back face culling and putting faces to sorting list
@@ -320,7 +320,7 @@ void test3d_run()
         }
         face_sort(facesort, faces_to_draw);
 #endif
-        rasterdot(argb_to_555(255, 0, 255));
+        //rasterdot(argb_to_555(255, 0, 255));
 
         // setup HW interpolators
         if (state == STATE_DUCK3DS) {
@@ -423,7 +423,7 @@ void test3d_run()
         }
 #endif
         // draw "rasterbar"
-        rasterdot(argb_to_555(255, 255, 255));
+        //rasterdot(argb_to_555(255, 255, 255));
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
         dvi_wait_for_vblank();
         frame_counter++;

@@ -232,7 +232,7 @@ static void lxm_update_ofs(lxm_context_t* ctx, int ch, int ofs) {
         ctx->channels[ch].mixer.stopped = false;
     }
 }
-static const uint8_t* lxm_parse_set_mask(lxm_context_t *ctx, int ch, const uint8_t *data, int valmask) {
+static const uint8_t* __not_in_flash_func(lxm_parse_set_mask)(lxm_context_t *ctx, int ch, const uint8_t *data, int valmask) {
     if (valmask & LXM_STREAM_SET_SAMPLE) {
         ctx->channels[ch].sample = ctx->samples + *data; data += 1;
         ctx->channels[ch].mixer.pos.p = 0;
@@ -264,7 +264,7 @@ static const uint8_t* lxm_parse_set_mask(lxm_context_t *ctx, int ch, const uint8
 }
 
 // get and parse delay
-uint32_t lxm_set_delay(const uint8_t** data) {
+uint32_t __not_in_flash_func(lxm_set_delay)(const uint8_t** data) {
     uint32_t delay = 0;
     if (**data == LXM_STREAM_DELAY_INT32) {
         delay = (
@@ -293,7 +293,7 @@ uint32_t lxm_set_delay(const uint8_t** data) {
     return delay;
 }
 
-int lxm_tick(lxm_context_t* ctx) {
+int __not_in_flash_func(lxm_tick)(lxm_context_t* ctx) {
     int ch = 0;
     int rtn = 0;
     uint32_t newdelay = 0;

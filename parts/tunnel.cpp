@@ -171,9 +171,9 @@ void calcgrid(grid_t *grid, vec3f &o, vec3f &d, float t) {
 
     float l0 = 63, l1 = 32;
 
-    if (t < 1.0) {
+    if (t < 2.0) {
         l0 = 63;
-        l1 = smoothstep(63, 32, clamp(t, 0, 1));
+        l1 = smoothstep(63, 32, clamp(t/2.0f, 0, 1));
     }
 
     if (t > 19.0f) {

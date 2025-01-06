@@ -142,10 +142,9 @@ int main(void) {
     }
 #endif
 
+    fb_fill_a(fb[fbIdx], argb_to_555(16, 16, 48), X_RES*Y_RES);
+    fb_fill_a(fb[fbIdx^1], argb_to_555(16, 16, 48), X_RES*Y_RES);
     while (lxm_current_frame() < (3*16));
-    // PLACEHOLDER for another part needed
-    fb_fill_a(fb[fbIdx], argb_to_555(64, 64, 64), X_RES*Y_RES);
-    //while (lxm_current_frame() < (3*16 + 2*3*64));
 
 #if 1
     bmpdist_init();
@@ -171,7 +170,16 @@ int main(void) {
     test3d_run();
     test3d_done();
 #endif
-
+    {
+        dvi_wait_for_vblank();
+        fb_fill_a(fb[fbIdx], argb_to_555(255, 255, 255), X_RES*Y_RES);
+        dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
+        dvi_wait_for_vblank();
+        dvi_wait_for_vblank();
+        // TODO: end picture
+        fb_fill_a(fb[fbIdx], argb_to_555(0, 0, 0), X_RES*Y_RES);
+        dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
+    }
     printf("end of demo. :p\n");
     blink_led_hang();
 }
