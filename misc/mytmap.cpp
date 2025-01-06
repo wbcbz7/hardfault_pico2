@@ -22,9 +22,9 @@ inline int next4(int i) {return (i + 1) & 3;}         // that's VERY simple inde
     poly vertex work layout:
     x = x, y = y, z = d/z (d is any value > 0), w = ceil(y)
 
-    ах да, переписываем половину кода нахуй
-    конкретно - всё вычисляем во float и переходим в fixedpoint на этапе интерполяции по ребрам
-    так быстрее (в теории :), меньше риск переполнений и проще впиливать коррекцию перспективы
+    everything is calcualted in float, fixed point convertsion is done before the edge interpolation step
+
+    ported from x86 sources, subpixel correction temporarily removed (but of course Cortex-M33 can handle it :)
 */
 
 static uint8_t  *mytmap_dst;
@@ -72,8 +72,8 @@ struct poly_lerp_gradients_t {
     union {uint8_t  *texture;  uint16_t *texture16;};
     union {uint8_t  *texture2; uint16_t *texture2_16;};
     union {
-        uint8_t  *blendtab;     // 256x256
-        uint16_t *blendtab16;     // 256x256
+        uint8_t  *blendtab;
+        uint16_t *blendtab16;
     };
     uint32_t uvmask;
     uint32_t uvmask2;
