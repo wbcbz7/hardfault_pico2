@@ -230,8 +230,8 @@ void test3d_run()
         if ((lxmf > (deltalxm + 1*3*64 + 3*48)) && (lxmf < (deltalxm + 2*3*64))) {
             oo.y += dt*3.0f;
         }
-        if ((lxmf > (deltalxm + 2*3*64 + 3*0)) && (lxmf < (deltalxm + 2*3*64 + 3*32))) {
-            oo.y -= dt*3.0f;
+        if ((lxmf > (deltalxm + 2*3*64 + 3*0)) && (lxmf < (deltalxm + 2*3*64 + 3*64))) {
+            oo.y = oo.y + 0.3f*dt*3.0f*(0.0f - oo.y);
             if (oo.y <= 0.0f) oo.y = 0.0f;
         }
         if ((lxmf > (deltalxm + 3*3*64 + 3*48)) && (lxmf < (deltalxm + 3*3*64 + 3*64))) {
@@ -251,8 +251,8 @@ void test3d_run()
             rot4r(m_rot, 0.5*sin(t*1.7), t*1.9, 0.2*sin(t*0.7));
             ofs4(m_ofs, cam.x, cam.y, cam.z);
         } else {
-            cam.x = 0.7f*sin((t*1.5f) - ((2*3*64 + 3*16)/36.0f));
-            cam.y = 0.7f*sin((t*1.3f) - ((2*3*64 + 3*16)/36.0f));
+            cam.x = 0.7f*sin((t*1.5f));
+            cam.y = 0.7f*sin((t*1.3f));
             cam.z = 2.6f;
             cam += oo;
 

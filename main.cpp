@@ -17,11 +17,11 @@
 #include <math.h>
 #include <string.h>
 
-#include <algorithm>    // for std::sort()
-
 #include "dvi.h"
 #include "defs.h"
 #include "core1.h"
+
+#include "textures/endpic.h"
 
 // parts include
 #include "parts/linetunnel.h"
@@ -177,7 +177,8 @@ int main(void) {
         dvi_wait_for_vblank();
         dvi_wait_for_vblank();
         // TODO: end picture
-        fb_fill_a(fb[fbIdx], argb_to_555(0, 0, 0), X_RES*Y_RES);
+        memcpy(fb[fbIdx], endpic, sizeof(endpic));
+        //fb_fill_a(fb[fbIdx], argb_to_555(0, 0, 0), X_RES*Y_RES);
         dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
     }
     printf("end of demo. :p\n");
