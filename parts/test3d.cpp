@@ -24,6 +24,9 @@
 #include "../textures/env_envmap.h"
 #include "../textures/env_blendtab.h"
 
+#include "../textures/bgmap_tex.h"
+#include "../textures/bgmap_tiles.h"
+
 enum {
     MAX_VERTICES            = 500,
     MAX_NORMALS             = 500,
@@ -46,6 +49,29 @@ static uint8_t  *texture;
 static uint8_t  *envmap;
 static uint16_t *phongtab;
 
+// bgmap stuff
+// tilemap texture
+uint8_t  *bgtexture;//[TEXTURE_SIZE*TEXTURE_SIZE];
+// mapping table
+uint16_t *bgmappingtab;//[X_GRID*Y_GRID];
+// tile graphics
+uint16_t *bgtilegfx;//[MAX_TILES][GRID_SIZE*GRID_SIZE];
+
+#define MAX_TILES   10
+#define MAX_TILES   10
+#define GRID_SIZE   8
+#define X_GRID      (X_RES/GRID_SIZE)
+#define Y_GRID      (Y_RES/GRID_SIZE)
+#define X_RES_GRID  (X_GRID*GRID_SIZE)
+#define Y_RES_GRID  (Y_GRID*GRID_SIZE)
+
+#define TEXTURE_SIZE_LOG2 5
+#define TEXTURE_SIZE (1 << TEXTURE_SIZE_LOG2)
+
+static void bg_calctab();
+static void bg_calctiles();
+static void bg_calctex();
+
 void test3d_init()
 {
     kucha_reset();
@@ -57,9 +83,17 @@ void test3d_init()
     envmap    = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
     phongtab  = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(64*256));
 
+    bgtexture    = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(TEXTURE_SIZE*TEXTURE_SIZE));
+    bgmappingtab = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(X_GRID*Y_GRID));
+    bgtilegfx    = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(MAX_TILES*GRID_SIZE*GRID_SIZE));
+
     memcpy(texture, env_texture, sizeof(uint8_t)*256*256);
     memcpy(envmap, env_envmap, sizeof(uint8_t)*256*256);
     memcpy(phongtab, env_blendtab, sizeof(uint16_t)*64*256);
+
+    bg_calctex();
+    bg_calctiles();
+    bg_calctab();
 
     // calculate shading table
     argb32 c0, c1;
@@ -81,6 +115,80 @@ void test3d_done()
     kucha_reset();
 }
 
+static void bg_calctab() {
+    uint16_t *t = bgmappingtab;
+    for (int y = -Y_GRID/2; y < Y_GRID/2; y++) {
+        for (int x = -X_GRID/2; x < X_GRID/2; x++) {
+#if 1
+            // calculate radius and angle first, and normalize to [1; 1] range
+            float r = (sqrt(x*x + y*y) + 1e-6f);
+            float a = 1.5f * (1.0f * (atan2(y, x) + pi)) / pi;
+            
+            // then calculate U and V factors
+            float u = 100.0f/r;
+            float v = TEXTURE_SIZE * (a);
+            
+            int iu = u;
+            int iv = v;
+#else
+            // calculate radius and angle first, and normalize to [1; 1] range
+            float r = (sqrt(x*x + y*y) + 1e-6f);
+            float a = 1.5f * (1.0f * (atan2(y, x) + pi)) / pi;
+            
+            // then calculate U and V factors
+            float u = pow(r, 1.1f);
+            float v = TEXTURE_SIZE * (a + (pi/8.0f)*sin(2.0f*a*pi));
+            
+            int iu = -u;
+            int iv = v;
+#endif
+            *t++ = ((iv & 0x1F) << 5) | ((iu) & 0x1F);
+        }
+    }
+}
+
+static void bg_calctex() {
+    uint8_t *t = bgtexture;
+    for (int y = -TEXTURE_SIZE/2; y < TEXTURE_SIZE/2; y++) {
+        for (int x = -TEXTURE_SIZE/2; x < TEXTURE_SIZE/2; x++) {
+            //int r = (x ^ y) & 7;
+            //*t++ = r;
+            float r = sin(sqrt(x*x + y*y)*0.2);
+            *t++ = ((r * 4.5) + 5);
+        }
+    }
+}
+
+static void bg_calctiles() {
+    const uint8_t *p = bgmap_tiles;
+    for (int gl = 0; gl < MAX_TILES; gl++) {
+        uint16_t *tile = bgtilegfx + (gl*GRID_SIZE*GRID_SIZE);
+        for (int y = 0; y < GRID_SIZE; y++) {
+            for (int x = 0; x < GRID_SIZE; x++) {
+                uint8_t a = *p++;
+                *tile++ = a > 0 ? argb_to_555(32, 80, 64) : argb_to_555(24, 32, 24);
+            }
+        }
+    }
+}
+
+extern "C" void bgmap_copy_8x8(uint16_t *dst, uint16_t *src, uint32_t dstfixup);
+
+static void bg_map(uint16_t *fb, uint32_t tabofs) {
+    uint32_t texmask = (1 << (TEXTURE_SIZE_LOG2*2)) - 1;
+    uint16_t *p = fb;
+    uint16_t *tab = bgmappingtab;
+    for (int j = 0; j < Y_GRID; j++) {
+        for (int i = 0; i < X_GRID; i++) {
+            uint16_t *tile = &bgtilegfx[bgtexture[(*tab++ + tabofs) & texmask]*GRID_SIZE*GRID_SIZE];
+            bgmap_copy_8x8(p, tile, (X_RES - GRID_SIZE)*BYTES_PER_PIXEL);
+            p += GRID_SIZE;
+        }
+        p += (X_RES * (GRID_SIZE-1));
+    }
+}
+
+
 void test3d_run()
 {
     //const incobj_t *obj = duck3ds_object;
@@ -96,7 +204,13 @@ void test3d_run()
 
     while(1) {
         float t = frame_counter / 60.0f;
-        fb_fill_a(&fb[fbIdx], 0, X_RES*Y_RES);
+        {
+            int u = TEXTURE_SIZE*t*1.0f;
+            int v = TEXTURE_SIZE*(1.5f*sin(t*1.0f) + cos(t*0.8f));
+            uint32_t tabofs = (u & (TEXTURE_SIZE-1)) | ((v & (TEXTURE_SIZE-1)) << TEXTURE_SIZE_LOG2);
+            bg_map(fb[fbIdx], tabofs);
+        }
+        //fb_fill_a(&fb[fbIdx], 0, X_RES*Y_RES);
         rasterdot(argb_to_555(0, 0, 255));
         mytmap_polydraw_init(&fb[fbIdx], X_RES*BYTES_PER_PIXEL);
 #if 0

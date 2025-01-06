@@ -176,8 +176,8 @@ void calcgrid(grid_t *grid, vec3f &o, vec3f &d, float t) {
         l1 = smoothstep(63, 32, clamp(t, 0, 1));
     }
 
-    if (t > 20.0f) {
-        float tt = (t - 20.0f)/2.0f;
+    if (t > 19.0f) {
+        float tt = (t - 19.0f)/2.0f;
         l0 = smoothstep(63, 63, clamp(tt, 0, 1));
         l1 = smoothstep(32, 63, clamp(tt, 0, 1));
     }

@@ -94,6 +94,10 @@ int main(void) {
     stdio_init_all();
     printf("sysclk switch success\n");
 
+    // reset core1 and wait a moment to prevent issues after flashing
+    multicore_reset_core1();
+    sleep_ms(500);
+
     // claim some of used HW
     interp_claim_lane_mask(interp0, 3);
     interp_claim_lane_mask(interp1, 3); // claim both interpolators since they are used for texture mapping
@@ -123,11 +127,11 @@ int main(void) {
 
     // clear framebuffer, wait 4 seconds to wakeup
     fb_fill_a(fb[fbIdx], argb_to_555(32, 8, 8), X_RES*Y_RES);
-    sleep_ms(3*1000);
+    sleep_ms(1*1000);
     fb_fill_a(fb[fbIdx], argb_to_555(8, 8, 32), X_RES*Y_RES);
-    sleep_ms(2*1000);
+    sleep_ms(1*1000);
     fb_fill_a(fb[fbIdx], argb_to_555(32, 32, 32), X_RES*Y_RES);
-    sleep_ms(3*1000);
+    sleep_ms(1*1000);
 
 #if 1
     // start audio
@@ -138,25 +142,24 @@ int main(void) {
     }
 #endif
 
-
     while (lxm_current_frame() < (3*16));
     // PLACEHOLDER for another part needed
     fb_fill_a(fb[fbIdx], argb_to_555(64, 64, 64), X_RES*Y_RES);
     while (lxm_current_frame() < (3*16 + 2*3*64));
 
-#if 1
+#if 0
     bmpdist_init();
     linetunnel_init();
     ftimer_set(0.0);
     linetunnel_run();
     linetunnel_done();
 #endif
-#if 1
+#if 0
     ftimer_set(0.0);
     bmpdist_run();
     bmpdist_done();
 #endif
-#if 1
+#if 0
     tunnel_init();
     ftimer_set(0.0);
     tunnel_run();
@@ -175,5 +178,6 @@ int main(void) {
     test3d_done();
 #endif
 
-    panic("end of demo. :p\n");
+    printf("end of demo. :p\n");
+    blink_led_hang();
 }
