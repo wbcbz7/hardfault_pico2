@@ -145,31 +145,25 @@ int main(void) {
     while (lxm_current_frame() < (3*16));
     // PLACEHOLDER for another part needed
     fb_fill_a(fb[fbIdx], argb_to_555(64, 64, 64), X_RES*Y_RES);
-    while (lxm_current_frame() < (3*16 + 2*3*64));
+    //while (lxm_current_frame() < (3*16 + 2*3*64));
 
-#if 0
+#if 1
     bmpdist_init();
     linetunnel_init();
     ftimer_set(0.0);
     linetunnel_run();
     linetunnel_done();
 #endif
-#if 0
+#if 1
     ftimer_set(0.0);
     bmpdist_run();
     bmpdist_done();
 #endif
-#if 0
+#if 1
     tunnel_init();
     ftimer_set(0.0);
     tunnel_run();
     tunnel_done();
-#endif
-#if 0
-    bgmap_init();
-    ftimer_set(0.0);
-    bgmap_run();
-    bgmap_done();
 #endif
 #if 1
     test3d_init();

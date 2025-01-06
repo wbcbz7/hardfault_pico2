@@ -14,6 +14,7 @@
 #include <palerp.h>
 #include <timer.h>
 #include <kucha.h>
+#include <lxmplay.h>
 
 #include "../objects/duck3ds.h"
 #include "../objects/torus2.h"
@@ -188,45 +189,77 @@ static void bg_map(uint16_t *fb, uint32_t tabofs) {
     }
 }
 
+enum {
+    STATE_DUCK3DS,
+    STATE_TORUS
+};
 
 void test3d_run()
 {
-    //const incobj_t *obj = duck3ds_object;
-    const incobj_t *obj = torus2_object;
+    int state = STATE_DUCK3DS;
+    vec3f oo = {0.0f, -4.0f, 0.0f};
 
     static const float FOV = 160.0f;
     static vec4f bbox = {.x = 0, .y = 0, .z = X_RES-1, .w = Y_RES-1};
 
     // calculate shading table
-
     fbIdx = 0;
     uint32_t frame_counter = 0;
 
-    while(1) {
-        float t = frame_counter / 60.0f;
+    int deltalxm = (3*16 + 12*3*64);
+    //int deltalxm = (3*16);
+
+    float t; volatile float ot = ftimer_get(); float dt;
+    while(lxm_current_frame() < (deltalxm + 4*3*64)) {
+        ot = t; t = ftimer_get(); dt = t - ot;
         {
             int u = TEXTURE_SIZE*t*1.0f;
             int v = TEXTURE_SIZE*(1.5f*sin(t*1.0f) + cos(t*0.8f));
             uint32_t tabofs = (u & (TEXTURE_SIZE-1)) | ((v & (TEXTURE_SIZE-1)) << TEXTURE_SIZE_LOG2);
             bg_map(fb[fbIdx], tabofs);
         }
-        //fb_fill_a(&fb[fbIdx], 0, X_RES*Y_RES);
         rasterdot(argb_to_555(0, 0, 255));
         mytmap_polydraw_init(&fb[fbIdx], X_RES*BYTES_PER_PIXEL);
-#if 0
-        vec3f cam = {0, 0.3, 2.6};
-        mat4 view, view_inv;
-        mat4 m_rot; rot4(m_rot, 0.3*sin(t*1.2), t*0.9, 0.0);
-        mat4 m_ofs; ofs4(m_ofs, cam.x, cam.y, cam.z);
-#else
-        vec3f cam = {1.0f*sin(t*0.7f), 1.0f*sin(t*0.6f), 2.6f};
-        //vec3f cam = {0, 0, 2.6};
-        mat4 view, view_inv;
+    
+        int lxmf = lxm_current_frame();
+        // sync :D
+        if (lxmf < (deltalxm + 3*32)) {
+            oo.y += dt*2.75f;
+            if (oo.y >= 0.0f) oo.y = 0.0f;
+        }
+        if ((lxmf > (deltalxm + 1*3*64 + 3*48)) && (lxmf < (deltalxm + 2*3*64))) {
+            oo.y += dt*3.0f;
+        }
+        if ((lxmf > (deltalxm + 2*3*64 + 3*0)) && (lxmf < (deltalxm + 2*3*64 + 3*32))) {
+            oo.y -= dt*3.0f;
+            if (oo.y <= 0.0f) oo.y = 0.0f;
+        }
+        if ((lxmf > (deltalxm + 3*3*64 + 3*48)) && (lxmf < (deltalxm + 3*3*64 + 3*64))) {
+            oo.z -= dt*0.75f;
+        }
 
-        mat4 m_rot; rot4(m_rot, t*1.4, t*1.2, t*1.4);
-        //mat4 m_rot; rot4(m_rot, 0,0, t*0.9);
-        mat4 m_ofs; ofs4(m_ofs, cam.x, cam.y, cam.z);
-#endif
+        state = lxmf < (deltalxm + 2*3*64) ? STATE_DUCK3DS : STATE_TORUS;
+
+        vec3f cam; mat4 view, view_inv;
+        mat4 m_rot; mat4 m_ofs; 
+        if (state == STATE_DUCK3DS) {
+            cam.x = 0;
+            cam.y = 0.3;
+            cam.z = 2.6;
+            cam += oo;
+            
+            rot4r(m_rot, 0.5*sin(t*1.7), t*1.9, 0.2*sin(t*0.7));
+            ofs4(m_ofs, cam.x, cam.y, cam.z);
+        } else {
+            cam.x = 0.7f*sin((t*1.5f) - ((2*3*64 + 3*16)/36.0f));
+            cam.y = 0.7f*sin((t*1.3f) - ((2*3*64 + 3*16)/36.0f));
+            cam.z = 2.6f;
+            cam += oo;
+
+            rot4(m_rot, t*1.0, t*1.2, t*1.4);
+            ofs4(m_ofs, cam.x, cam.y, cam.z);
+        }
+
         matmul4(view, m_ofs, m_rot);
         inv4x3(view_inv, view);
 
@@ -238,6 +271,13 @@ void test3d_run()
         vec3f os_cam = {view_inv[3], view_inv[7], view_inv[11]};
 
         int faces_to_draw = 0, vtx_pos = 0;
+
+        const incobj_t *obj;
+        if (state == STATE_DUCK3DS) {
+            obj = duck3ds_object;
+        } else {
+            obj = torus2_object;
+        }
 
         // transform
         for (int i = 0; i < obj->total_pos; i++) {
@@ -283,16 +323,15 @@ void test3d_run()
         rasterdot(argb_to_555(255, 0, 255));
 
         // setup HW interpolators
-#if 0
-        mytmap_interp_setup_l_2x2(MYTMAP_INTERP_SHADETAB, shadetab, 16, 8, 0, 1);
-#else
-        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE,  texture, 16, 8, 8, 0);
-        mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE2, envmap,  16, 8, 8, 0);
-#endif
+        if (state == STATE_DUCK3DS) {
+            mytmap_interp_setup_l_2x2(MYTMAP_INTERP_SHADETAB, shadetab, 16, 8, 0, 1);
+        } else {
+            mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE,  texture, 16, 8, 8, 0);
+            mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE2, envmap,  16, 8, 8, 0);
+        }
 
 #if 1
-        // draw flat faces!
-        // draw faces, without any particular order
+        // draw faces
         const face_sort_t *fs = facesort;
         for (int i = 0; i < faces_to_draw; i++) {
             const incobj_face_t *objf = fs->face;
@@ -330,46 +369,46 @@ void test3d_run()
                 }
             }
 #endif
-#if 0
-            // gouraud shading
-            for (int vtx = 0; vtx < objf->length; vtx++) {
-                float dotNL = max(dot(obj->n[idx[vtx].n], os_l), 0.02f);
-                //float l = 0.4*dotNL + 0.6*pow(dotNL,16.0);
-                //float dotNL = ff[vtx].fp->z * 0.7;
-                ff[vtx].fl = dotNL * 250; // fix dithering
+            if (state == STATE_DUCK3DS) {
+                // gouraud shading
+                for (int vtx = 0; vtx < objf->length; vtx++) {
+                    float dotNL = max(dot(obj->n[idx[vtx].n], os_l), 0.02f);
+                    //float l = 0.4*dotNL + 0.6*pow(dotNL,16.0);
+                    //float dotNL = ff[vtx].fp->z * 0.7;
+                    ff[vtx].fl = dotNL * 250; // fix dithering
+                }
+                mytmap_interp_set_texture(MYTMAP_INTERP_SHADETAB, shadetab[objf->mat]);
+                int poly_count = clippoly(ff, 3, CLIP_BOUNDARY_MASK | CLIP_FLAGS_L, &bbox);
+                switch(poly_count) {
+                    case 0: case 1: case 2: break;
+                    case 3:     mytmap_draw_tri_gouraud_16 (ff, shadetab[objf->mat]); break;
+                    default:    mytmap_draw_poly_gouraud_16(ff, poly_count, shadetab[objf->mat]); break;
+                } 
             }
-            mytmap_interp_set_texture(MYTMAP_INTERP_SHADETAB, shadetab[objf->mat]);
-            int poly_count = clippoly(ff, 3, CLIP_BOUNDARY_MASK | CLIP_FLAGS_L, &bbox);
-            switch(poly_count) {
-                case 0: case 1: case 2: break;
-                case 3:     mytmap_draw_tri_gouraud_16 (ff, shadetab[objf->mat]); break;
-                default:    mytmap_draw_poly_gouraud_16(ff, poly_count, shadetab[objf->mat]); break;
-            } 
-#endif
-#if 1
-            // environment mapping!
-            vec2f uv[3];
-            for (int vtx = 0; vtx < objf->length; vtx++) {
-                ff[vtx].fuv2 = (vec2f*)&nt[idx[vtx].n];
+            else {
+                // tmap with PHONG environment mapping!!
+                vec2f uv[3];
+                for (int vtx = 0; vtx < objf->length; vtx++) {
+                    ff[vtx].fuv2 = (vec2f*)&nt[idx[vtx].n];
+                }
+                int poly_count = clippoly(ff, 3, CLIP_BOUNDARY_MASK | CLIP_FLAGS_UV | CLIP_FLAGS_UV2, &bbox);
+                switch(poly_count) {
+                    case 0: case 1: case 2: break;
+                    case 3:     mytmap_draw_tri_multitex_16 (
+                        ff,
+                        (uint8_t*) texture,
+                        (uint8_t*) envmap,
+                        (uint16_t*)phongtab
+                    ); break;
+                    default:    mytmap_draw_poly_multitex_16(
+                        ff,
+                        poly_count,
+                        (uint8_t*) texture,
+                        (uint8_t*) envmap,
+                        (uint16_t*)phongtab
+                    ); break;
+                }
             }
-            int poly_count = clippoly(ff, 3, CLIP_BOUNDARY_MASK | CLIP_FLAGS_UV | CLIP_FLAGS_UV2, &bbox);
-            switch(poly_count) {
-                case 0: case 1: case 2: break;
-                case 3:     mytmap_draw_tri_multitex_16 (
-                    ff,
-                    (uint8_t*) texture,
-                    (uint8_t*) envmap,
-                    (uint16_t*)phongtab
-                ); break;
-                default:    mytmap_draw_poly_multitex_16(
-                    ff,
-                    poly_count,
-                    (uint8_t*) texture,
-                    (uint8_t*) envmap,
-                    (uint16_t*)phongtab
-                ); break;
-            }
-#endif
             fs++;
         }
 #endif

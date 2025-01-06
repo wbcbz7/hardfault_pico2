@@ -115,7 +115,7 @@ static void drawgrid(uint16_t *fb, grid_t *grid, const uint16_t* texture) {
 }
 
 //const float endtime = 10.5f;
-const float endtime = 20.5f;
+const float endtime = 20.7f;
 
 static void calcgrid(grid_t *grid, float t) {
     mat2  rot; 
