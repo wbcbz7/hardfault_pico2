@@ -8,7 +8,7 @@ fb_fill_a:
     push    {r4, r5, r6, lr}
     lsrs    r2, 4
     beq     2f
-    ubfx	r1, r1, #0, #15     // clear high halfword
+    ubfx    r1, r1, #0, #15     // clear high halfword
     orr     r1, r1, r1, lsl #16 // and duplucate with low halfword content
     mov     r4, r1
     mov     r5, r1
