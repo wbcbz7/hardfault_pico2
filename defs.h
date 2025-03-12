@@ -10,8 +10,13 @@
 #define X_RES_SCROLLER   352
 #define X_PITCH_SCROLLER (X_RES_SCROLLER*BYTES_PER_PIXEL)
 
+// stability test stuff
+//#define TEXTURES_FROM_FLASH
+//#define USE_DEFAULT_SYSTEM_CLOCK
+//#define DO_OVERVOLT
+
 // clock multiplier
-#define CLK_SYS_MUL          1
+#define CLK_SYS_MUL          2
 
 // video mode pixel clock
 #define MODE_PIXEL_CLOCK     25200*KHZ

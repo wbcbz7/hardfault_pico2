@@ -59,6 +59,7 @@ uint8_t  fbIdx = 0;
 
 // ----------------------------------------------------------------------------
 
+#if 0
 // HSTX pin layout
 #ifdef HSTX_OUT_MURMULATOR2
 // Murmulator 2 board
@@ -78,6 +79,28 @@ static union dvi_hstx_pin_layout_t hstx_out_pins = {
     .lane2_n = 17-12, .lane2_p = 16-12,
 };
 #endif
+#endif
+
+enum {
+    HSTX_OUT_PIN_LAYOUT_MURMULATOR2,
+    HSTX_OUT_PIN_LAYOUT_PICODVISOCK,
+};
+
+static union dvi_hstx_pin_layout_t hstx_out_pin_layouts[] = {
+    {   // Murmulator 2
+    .clock_n = 0, .clock_p = 1,
+    .lane0_n = 2, .lane0_p = 3,
+    .lane1_n = 4, .lane1_p = 5,
+    .lane2_n = 6, .lane2_p = 7,
+    },
+    {   // Pico-DVI-Sock
+    .clock_n = 15-12, .clock_p = 14-12,
+    .lane0_n = 13-12, .lane0_p = 12-12,
+    .lane1_n = 19-12, .lane1_p = 18-12,
+    .lane2_n = 17-12, .lane2_p = 16-12,
+    }
+};
+static union dvi_hstx_pin_layout_t hstx_out_pins;
 
 // ----------------------------------------------------------------------------
 // audio stuff
@@ -297,6 +320,18 @@ int audio_init() {
 // core 1 task
 void __scratch_y("") core1_task() {
     printf("core 1 started...\n");
+
+    // get pinout
+    gpio_init(28);
+    gpio_set_pulls(28, true, false);
+    gpio_set_dir(28, false);
+    sleep_ms(1);
+    if (gpio_get(28) == 0) 
+        hstx_out_pins = hstx_out_pin_layouts[HSTX_OUT_PIN_LAYOUT_PICODVISOCK];
+    else 
+        hstx_out_pins = hstx_out_pin_layouts[HSTX_OUT_PIN_LAYOUT_MURMULATOR2];
+
+    printf("GPIO28 = %d\n", gpio_get(28));
 
     while (1) {
 #if 1

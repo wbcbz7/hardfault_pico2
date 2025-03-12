@@ -15,6 +15,12 @@
 #include <timer.h>
 #include <kucha.h>
 #include <lxmplay.h>
+#include <tprintf.h>
+#include "hardware/clocks.h"
+#include "hardware/pll.h"
+
+#include "hardware/structs/clocks.h"
+#include "hardware/structs/qmi.h"
 
 #include "../objects/duck3ds.h"
 #include "../objects/torus2.h"
@@ -80,9 +86,15 @@ void test3d_init()
     nt = (vec3f*)kucha_alloc(sizeof(vec3f)*MAX_NORMALS);
     facesort = (face_sort_t*)kucha_alloc(sizeof(face_sort_t)*MAX_FACES);
 
+#ifdef TEXTURES_FROM_FLASH
+    texture   = (uint8_t*)env_texture;
+    envmap    = (uint8_t*)env_envmap;
+    phongtab  = (uint16_t*)env_blendtab;
+#else
     texture   = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
     envmap    = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
     phongtab  = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(64*256));
+#endif
 
     bgtexture    = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(TEXTURE_SIZE*TEXTURE_SIZE));
     bgmappingtab = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(X_GRID*Y_GRID));
@@ -197,7 +209,7 @@ enum {
 void test3d_run()
 {
     int state = STATE_DUCK3DS;
-    vec3f oo = {0.0f, -4.0f, 0.0f};
+    vec3f oo = {0.0f, -0.0f, 0.0f};
 
     static const float FOV = 160.0f;
     static vec4f bbox = {.x = 0, .y = 0, .z = X_RES-1, .w = Y_RES-1};
@@ -211,7 +223,25 @@ void test3d_run()
 
     float t; volatile float ot = ftimer_get(); float dt;
     dvi_wait_for_vblank();
+#if 0
     while(lxm_current_frame() < (deltalxm + 4*3*64)) {
+#else
+    uint32_t clk_sys_hz = clock_get_hz(clk_sys);
+    uint32_t clk_sys_ctrl = clocks_hw->clk[clk_sys].ctrl;
+    uint32_t clk_sys_div = clocks_hw->clk[clk_sys].div;
+    uint32_t clk_hstx_ctrl = clocks_hw->clk[clk_hstx].ctrl;
+    uint32_t clk_hstx_div = clocks_hw->clk[clk_hstx].div;
+    uint32_t qmi_m0_timing = qmi_hw->m[0].timing;
+    uint32_t pll_sys_cs = pll_sys->cs;
+    uint32_t pll_sys_fbdiv = pll_sys->fbdiv_int;
+    uint32_t pll_sys_prim = pll_sys->prim;
+    printf("CLK_SYS CTRL=%08X DIV=%08X | QMI_M0_TIMING=%08X\n", clk_sys_ctrl, clk_sys_div, qmi_m0_timing);
+    printf("PLLSYS CS=%08X FBDIV=%08X PRIM=%08X\n", pll_sys_cs, pll_sys_fbdiv, pll_sys_prim);
+    printf("CLKHSTX CTRL=%08X DIV=%08X", clk_hstx_ctrl, clk_hstx_div);;
+
+    while(true) {
+       
+#endif
         ot = t; t = ftimer_get(); dt = t - ot;
         {
             int u = TEXTURE_SIZE*t*1.0f;
@@ -223,6 +253,7 @@ void test3d_run()
         mytmap_polydraw_init(&fb[fbIdx], X_RES*BYTES_PER_PIXEL);
     
         int lxmf = lxm_current_frame();
+#if 0
         // sync :D
         if (lxmf < (deltalxm + 3*32)) {
             oo.y += dt*2.75f;
@@ -238,8 +269,9 @@ void test3d_run()
         if ((lxmf > (deltalxm + 3*3*64 + 3*48)) && (lxmf < (deltalxm + 3*3*64 + 3*64))) {
             oo.z -= dt*0.7f;
         }
+#endif
 
-        state = lxmf < (deltalxm + 2*3*64) ? STATE_DUCK3DS : STATE_TORUS;
+        state = STATE_DUCK3DS;
 
         vec3f cam; mat4 view, view_inv;
         mat4 m_rot; mat4 m_ofs; 
@@ -251,7 +283,8 @@ void test3d_run()
             
             rot4r(m_rot, 0.5*sin(t*1.7), t*1.9, 0.2*sin(t*0.7));
             ofs4(m_ofs, cam.x, cam.y, cam.z);
-        } else {
+        }
+        else{
             cam.x = 0.7f*sin((t*1.5f));
             cam.y = 0.7f*sin((t*1.3f));
             cam.z = 2.6f;
@@ -322,11 +355,13 @@ void test3d_run()
         face_sort(facesort, faces_to_draw);
 #endif
         //rasterdot(argb_to_555(255, 0, 255));
-
+#if 0
         // setup HW interpolators
         if (state == STATE_DUCK3DS) {
             mytmap_interp_setup_l_2x2(MYTMAP_INTERP_SHADETAB, shadetab, 16, 8, 0, 1);
-        } else {
+        } else
+#endif
+        {
             mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE,  texture, 16, 8, 8, 0);
             mytmap_interp_setup_uv(MYTMAP_INTERP_TEXTURE2, envmap,  16, 8, 8, 0);
         }
@@ -370,6 +405,7 @@ void test3d_run()
                 }
             }
 #endif
+#if 0
             if (state == STATE_DUCK3DS) {
                 // gouraud shading
                 for (int vtx = 0; vtx < objf->length; vtx++) {
@@ -385,8 +421,9 @@ void test3d_run()
                     case 3:     mytmap_draw_tri_gouraud_16 (ff, shadetab[objf->mat]); break;
                     default:    mytmap_draw_poly_gouraud_16(ff, poly_count, shadetab[objf->mat]); break;
                 } 
-            }
-            else {
+            } else
+#endif
+            {
                 // tmap with PHONG environment mapping!!
                 vec2f uv[3];
                 for (int vtx = 0; vtx < objf->length; vtx++) {
@@ -423,10 +460,23 @@ void test3d_run()
             vp++;
         }
 #endif
+        // draw debug text
+        tprintf(0, 0, "sysclk=%6.2fmhz, t=%7.1fs, fps=%4.1f", clk_sys_hz/((float)MHZ), ftimer_get(), dt == 0.0f ? 0.0f : 1.0f/dt);
+        tprintf(0, 8, "PLLSYS CS=%08X FBDIV=%08X PRIM=%08X", pll_sys_cs, pll_sys_fbdiv, pll_sys_prim);
+        tputstr(0, 16, "texturing from "
+#ifdef TEXTURES_FROM_FLASH
+        "flash"
+#else
+        "SRAM"
+#endif
+        );
+        tprintf(0, Y_RES-8,  "CLKSYS  CTRL=%08X DIV=%08X | QMI_M0_TIMING=%08X", clk_sys_ctrl, clk_sys_div, qmi_m0_timing);
+        tprintf(0, Y_RES-16, "CLKHSTX CTRL=%08X DIV=%08X", clk_hstx_ctrl, clk_hstx_div);
+
         // draw "rasterbar"
         //rasterdot(argb_to_555(255, 255, 255));
-        dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
-        dvi_wait_for_vblank();
+        dvi_set_framebuffer(&fb[fbIdx], true); fbIdx ^= 1;
+        //dvi_wait_for_vblank();
         frame_counter++;
     }
 }

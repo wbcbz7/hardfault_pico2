@@ -76,17 +76,19 @@ int main(void) {
     stdio_init_all();
     printf("-------------------------------\n");
     
-#if 0
+#if DO_OVERVOLT
     // bump up RP2350 voltage a bit
-    vreg_set_voltage(VREG_VOLTAGE_1_25);
+    vreg_set_voltage(VREG_VOLTAGE_1_30);
 #endif
 
+#ifndef USE_DEFAULT_SYSTEM_CLOCK
     printf("target sysclk = %d kHz\n", (MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000);
     // configure PLL for required pixel clock
     if (!set_sys_clock_khz((MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000, false)) {
         printf("fatal: unable to configure sysclk!\n");
         blink_led_hang();
     };
+#endif
     // configure as usual
     clock_configure_int_divider(clk_hstx, CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLK_SYS, 0, clock_get_hz(clk_sys), CLK_SYS_MUL);
 
@@ -124,7 +126,9 @@ int main(void) {
         printf("unable to start video: resp = %d\n", resp);
         blink_led_hang();
     }
+    printf("video start success\n");
 
+#if 0
     // clear framebuffer, wait 4 seconds to wakeup
     fb_fill_a(fb[fbIdx], argb_to_555(32, 8, 8), X_RES*Y_RES);
     sleep_ms(1*1000);
@@ -132,7 +136,8 @@ int main(void) {
     sleep_ms(1*1000);
     fb_fill_a(fb[fbIdx], argb_to_555(32, 32, 32), X_RES*Y_RES);
     sleep_ms(1*1000);
-
+#endif
+    
 #if 1
     // start audio
     queue_post_msg(CORE1_MSG_START_MUSIC, 0);
@@ -142,23 +147,25 @@ int main(void) {
     }
 #endif
 
+#if 0
     fb_fill_a(fb[fbIdx], argb_to_555(16, 16, 48), X_RES*Y_RES);
     fb_fill_a(fb[fbIdx^1], argb_to_555(16, 16, 48), X_RES*Y_RES);
     while (lxm_current_frame() < (3*16));
+#endif
 
-#if 1
+#if 0
     bmpdist_init();
     linetunnel_init();
     ftimer_set(0.0);
     linetunnel_run();
     linetunnel_done();
 #endif
-#if 1
+#if 0
     ftimer_set(0.0);
     bmpdist_run();
     bmpdist_done();
 #endif
-#if 1
+#if 0
     tunnel_init();
     ftimer_set(0.0);
     tunnel_run();

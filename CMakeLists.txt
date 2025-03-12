@@ -52,6 +52,7 @@ add_executable(dh2025w_demo
         misc/palerp.cpp
         misc/timer.cpp
         misc/kucha.cpp
+        misc/tprintf.cpp
 
         parts/test3d.cpp
         parts/linetunnel.cpp
@@ -87,6 +88,7 @@ target_link_libraries(dh2025w_demo
         hardware_clocks
         hardware_interp
         hardware_gpio
+        hardware_flash
         pico_sync
         pico_util
 )
