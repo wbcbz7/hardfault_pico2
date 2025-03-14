@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include "pico.h"
 
-#define KUCHA_SIZE 192*1024
+#define KUCHA_SIZE 184*1024
 static uint8_t kucha_heap[KUCHA_SIZE];
 
 static uint8_t* kucha_rover = kucha_heap;

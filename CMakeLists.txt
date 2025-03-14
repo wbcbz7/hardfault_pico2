@@ -79,7 +79,7 @@ target_include_directories(dh2025w_demo PUBLIC
 target_compile_options(dh2025w_demo PUBLIC -ffast-math -funsafe-math-optimizations)
 
 pico_enable_stdio_uart(dh2025w_demo 1)
-pico_enable_stdio_usb(dh2025w_demo 0)
+pico_enable_stdio_usb(dh2025w_demo 1)
 
 # pull in common dependencies
 target_link_libraries(dh2025w_demo
