@@ -76,9 +76,11 @@ int main(void) {
     stdio_init_all();
     printf("-------------------------------\n");
     
-#if DO_OVERVOLT
+#ifdef DO_OVERVOLT
+    vreg_disable_voltage_limit();
     // bump up RP2350 voltage a bit
-    vreg_set_voltage(VREG_VOLTAGE_1_30);
+    vreg_set_voltage(OVERVOLT_VOLTAGE);
+    sleep_ms(1);
 #endif
 
 #ifndef USE_DEFAULT_SYSTEM_CLOCK

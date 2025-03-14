@@ -473,6 +473,7 @@ void test3d_run()
         tprintf(0, Y_RES-8,  "CLKSYS  CTRL=%08X DIV=%08X | QMI_M0_TIMING=%08X", clk_sys_ctrl, clk_sys_div, qmi_m0_timing);
         tprintf(0, Y_RES-16, "CLKHSTX CTRL=%08X DIV=%08X", clk_hstx_ctrl, clk_hstx_div);
 
+        gpio_put(PICO_DEFAULT_LED_PIN, (frame_counter & 32));
         // draw "rasterbar"
         //rasterdot(argb_to_555(255, 255, 255));
         dvi_set_framebuffer(&fb[fbIdx], true); fbIdx ^= 1;

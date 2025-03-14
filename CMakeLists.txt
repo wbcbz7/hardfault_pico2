@@ -62,6 +62,10 @@ add_executable(dh2025w_demo
         parts/bgmap_a.S
 )
 
+add_compile_definitions(PICO_XOSC_STARTUP_DELAY_MULTIPLIER=64)
+add_compile_definitions(PICO_FLASH_SPI_CLKDIV=4)
+add_compile_definitions(CLK_SYS_MUL=3)
+
 pico_generate_pio_header(dh2025w_demo ${CMAKE_CURRENT_LIST_DIR}/dvi.pio)
 pico_generate_pio_header(dh2025w_demo ${CMAKE_CURRENT_LIST_DIR}/i2s.pio)
 

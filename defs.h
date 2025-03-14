@@ -13,10 +13,13 @@
 // stability test stuff
 //#define TEXTURES_FROM_FLASH
 //#define USE_DEFAULT_SYSTEM_CLOCK
-//#define DO_OVERVOLT
+#define DO_OVERVOLT
+#define OVERVOLT_VOLTAGE VREG_VOLTAGE_1_35
 
 // clock multiplier
+#ifndef CLK_SYS_MUL
 #define CLK_SYS_MUL          2
+#endif
 
 // video mode pixel clock
 #define MODE_PIXEL_CLOCK     25200*KHZ
