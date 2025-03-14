@@ -47,3 +47,7 @@ extern uint8_t  fbIdx;
 
 // core 1 "beacon"
 extern uint32_t core1_beacon;
+
+// overclocking parameters
+struct overclock_params_t;
+extern struct overclock_params_t ocparms;

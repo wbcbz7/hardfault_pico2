@@ -73,15 +73,73 @@ struct overclock_params_t ocparms = {
     .clk_khz = (MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000,
     .flash = {
         .clkdiv  = 3,
-        .rxdelay = 2
+        .rxdelay = 3
     },
-    .hstx_div = CLK_SYS_MUL
+    .voltage  = VREG_VOLTAGE_1_40,
+    .hstx_div = CLK_SYS_MUL,
+    .textures_from_flash = 0,
 };
+
+void set_config() {
+    printf("Enter system clock freqency [current - %d.%02d MHz]: ", ocparms.clk_khz / 1000, (ocparms.clk_khz % 1000) / 10);  fflush(stdout);
+    float new_sysclk;
+    if ((scanf("%f", &new_sysclk) == 1) && new_sysclk > 0) {
+        ocparms.clk_khz = (uint32_t)((new_sysclk * MHZ) / 1000);
+    }
+    printf("%d.%02d\n", ocparms.clk_khz / 1000, (ocparms.clk_khz % 1000) / 10);
+
+    printf("Enter QMI Flash clock divisor [current - %d]: ", ocparms.flash.clkdiv); fflush(stdout);
+    scanf("%u", &ocparms.flash.clkdiv);
+    if (ocparms.flash.clkdiv <= 0) ocparms.flash.clkdiv = (uint32_t)(new_sysclk / 133333.0f);
+    printf("%d\n", ocparms.flash.clkdiv);
+
+    printf("Enter QMI Flash RX delay [current - %d]: ", ocparms.flash.rxdelay); fflush(stdout);
+    scanf("%u", &ocparms.flash.rxdelay);
+    printf("%d\n", ocparms.flash.rxdelay);
+    if (ocparms.flash.rxdelay > ocparms.flash.clkdiv) printf("warning: RX delay must be less clock divisor!\n");
+
+    printf("Enter voltage [current - %.2f]: ", voltage_to_float(ocparms.voltage)); fflush(stdout);
+    float tempvoltage;
+    if ((scanf("%f", &tempvoltage) == 1) && tempvoltage > 0) {
+        ocparms.voltage = float_to_voltage(tempvoltage);
+    }
+    printf("%.2f\n", tempvoltage);
+    if (ocparms.voltage > VREG_VOLTAGE_1_50) printf("WARNING: VOLTAGE > 1.50 V!\n");
+
+    // calculate HSTX divisor to match the refresh rate
+    ocparms.hstx_div = roundf((float)ocparms.clk_khz / (5*MODE_PIXEL_CLOCK/KHZ));
+    uint32_t hstx_clk = ocparms.clk_khz / ocparms.hstx_div;
+    printf("HSTX divisor = %d, HSTX clock = %d.%02d MHz\n", 
+        ocparms.hstx_div, hstx_clk / 1000, (hstx_clk % 1000) / 10
+    );
+
+    printf("Select texture storage:\n");
+    printf("0 - from SRAM  (more load on CPU/SRAM)\n");
+    printf("1 - from flash (more load on flash)\n");
+    int a = 0; scanf("%u", &a);
+    if (a == 1) ocparms.textures_from_flash = 1;
+    printf("---------------\n");
+}
+
+void print_oc_settings(struct overclock_params_t *oc) {
+    uint32_t flashclk = oc->clk_khz / oc->flash.clkdiv;
+    uint32_t hstxclk  = oc->clk_khz / oc->hstx_div;
+    printf("sysclk = %d.%02d MHz, QMI flash divisor = %d (SCLK = %d.%02d MHz), RX delay = %d, voltage = %.2fV, HSTX clock = %d.%02d MHz\n",
+        oc->clk_khz / 1000, (oc->clk_khz % 1000) / 10,
+        oc->flash.clkdiv, flashclk / 1000, (flashclk % 1000) / 10, oc->flash.rxdelay,
+        voltage_to_float(ocparms.voltage),
+        hstxclk / 1000, (hstxclk % 1000) / 10
+    );
+}
 
 // ----------------------------------------------------------------------------
 // Main program
 
 int main(void) {
+    // reset core1 and wait a moment to prevent issues after flashing
+    multicore_reset_core1();
+    sleep_ms(500);
+
     // configure the almighty debug LED
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
@@ -90,34 +148,39 @@ int main(void) {
     stdio_init_all();
     stdio_async_uart_init_full(uart0, 115200, PICO_DEFAULT_UART_TX_PIN, PICO_DEFAULT_UART_RX_PIN);
     printf("-------------------------------\n");
+    printf("RP2350 hard_faulty ducky overclocking test - artemka 15.o3.2o25\n");
+    print_oc_settings(&ocparms);
     
-#ifdef DO_OVERVOLT
-    vreg_disable_voltage_limit();
-    // bump up RP2350 voltage a bit
-    vreg_set_voltage(OVERVOLT_VOLTAGE);
-    sleep_ms(1);
-#endif
+    int led_state = 0;
+    bool keypress = false;
+    {
+        printf("press any key for configuration or wait for 5 seconds for auto start\n");
+        while (time_us_32() < 5*1000*1000) {
+            sleep_ms(200); putc('.', stdout); fflush(stdout);
+            led_state ^= 1;
+            gpio_put(PICO_DEFAULT_LED_PIN, led_state);
+            if (stdio_getchar_timeout_us(0) >= 0) {
+                keypress = true; break;
+            }
+        }
+        printf("\n");
+        if (keypress) set_config();
+    }
+    print_oc_settings(&ocparms);
+    fflush(stdout);
+    sleep_ms(100);
 
-#ifndef USE_DEFAULT_SYSTEM_CLOCK
-    printf("target sysclk = %d kHz\n", (MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000); fflush(stdout);
-    // configure PLL for required pixel clock
-    if (!set_sys_clock_khz((MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000, false)) {
-        printf("fatal: unable to configure sysclk!\n");
+    // overclock!
+    if (do_overclock(&ocparms)) {
+        printf("unable to overclock!");
         blink_led_hang();
     };
-#endif
-    // configure as usual
-    clock_configure_int_divider(clk_hstx, CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLK_SYS, 0, clock_get_hz(clk_sys), CLK_SYS_MUL);
 
     // reinit stdio
     stdio_init_all();
     stdio_async_uart_init_full(uart0, 115200, PICO_DEFAULT_UART_TX_PIN, PICO_DEFAULT_UART_RX_PIN);
     
     printf("sysclk switch success\n");
-
-    // reset core1 and wait a moment to prevent issues after flashing
-    multicore_reset_core1();
-    sleep_ms(500);
 
     // claim some of used HW
     interp_claim_lane_mask(interp0, 3);

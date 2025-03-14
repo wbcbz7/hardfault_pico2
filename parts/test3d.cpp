@@ -16,6 +16,7 @@
 #include <kucha.h>
 #include <lxmplay.h>
 #include <tprintf.h>
+#include <overclock.h>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "hardware/pll.h"
@@ -87,15 +88,15 @@ void test3d_init()
     nt = (vec3f*)kucha_alloc(sizeof(vec3f)*MAX_NORMALS);
     facesort = (face_sort_t*)kucha_alloc(sizeof(face_sort_t)*MAX_FACES);
 
-#ifdef TEXTURES_FROM_FLASH
-    texture   = (uint8_t*)env_texture;
-    envmap    = (uint8_t*)env_envmap;
-    phongtab  = (uint16_t*)env_blendtab;
-#else
-    texture   = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
-    envmap    = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
-    phongtab  = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(64*256));
-#endif
+    if (ocparms.textures_from_flash) {
+        texture   = (uint8_t*)env_texture;
+        envmap    = (uint8_t*)env_envmap;
+        phongtab  = (uint16_t*)env_blendtab;
+    } else {
+        texture   = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
+        envmap    = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(256*256));
+        phongtab  = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(64*256));
+    }
 
     bgtexture    = (uint8_t*)kucha_alloc(sizeof(uint8_t)*(TEXTURE_SIZE*TEXTURE_SIZE));
     bgmappingtab = (uint16_t*)kucha_alloc(sizeof(uint16_t)*(X_GRID*Y_GRID));
@@ -464,15 +465,12 @@ void test3d_run()
         }
 #endif
         // draw debug text
-        tprintf(0, 0, "sysclk=%6.2fmhz, t=%7.1fs, fps=%4.1f", clk_sys_hz/((float)MHZ), ftimer_get(), dt == 0.0f ? 0.0f : 1.0f/dt);
+        tprintf(0, 0, "sysclk=%6.2fmhz QMI div=%d rxd=%d %.2fv | t=%7.1fs, fps=%4.1f",
+            clk_sys_hz/((float)MHZ),
+            ocparms.flash.clkdiv, ocparms.flash.rxdelay, voltage_to_float(ocparms.voltage),
+            ftimer_get(), dt == 0.0f ? 0.0f : 1.0f/dt);
         tprintf(0, 8, "PLLSYS CS=%08X FBDIV=%08X PRIM=%08X", pll_sys_cs, pll_sys_fbdiv, pll_sys_prim);
-        tputstr(0, 16, "texturing from "
-#ifdef TEXTURES_FROM_FLASH
-        "flash"
-#else
-        "SRAM"
-#endif
-        );
+        tprintf(0, 16, "texturing from %s", ocparms.textures_from_flash ? "flash" : "SRAM");
         tprintf(0, Y_RES-8,  "CLKSYS  CTRL=%08X DIV=%08X | QMI_M0_TIMING=%08X", clk_sys_ctrl, clk_sys_div, qmi_m0_timing);
         tprintf(0, Y_RES-16, "CLKHSTX CTRL=%08X DIV=%08X", clk_hstx_ctrl, clk_hstx_div);
 
@@ -483,7 +481,7 @@ void test3d_run()
         }
 
         gpio_put(PICO_DEFAULT_LED_PIN, (frame_counter & 64) | core1_hang);
-        if ((frame_counter & 2048) == 0) {printf("%d\n", frame_counter);}
+        if ((frame_counter & 2047) == 0) {printf("%d\n", frame_counter);}
         // draw "rasterbar"
         //rasterdot(argb_to_555(255, 255, 255));
         dvi_set_framebuffer(&fb[fbIdx], true); fbIdx ^= 1;

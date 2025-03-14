@@ -5,10 +5,25 @@
 #include "pico/multicore.h"
 #include "overclock.h"
 
+static const float vreg_voltage_to_float[] = {
+    0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15, 1.20, 1.25, 1.30,
+    1.35, 1.40, 1.50, 1.60, 1.65, 1.70, 1.80, 1.90, 2.00, 2.35, 2.50, 2.65, 2.80, 3.00, 3.15, 3.30
+};
+
+float voltage_to_float(int voltage) { return vreg_voltage_to_float[voltage]; }
+
+int float_to_voltage(float voltage) {
+    int vol;
+    for (vol = VREG_VOLTAGE_3_30; vol >= 0; vol--) {
+        if (vreg_voltage_to_float[vol] <= voltage) break;
+    }
+    return vol;
+}
+
 bool do_overclock(struct overclock_params_t *oc) {
     // set RP2350 voltage
     vreg_disable_voltage_limit();
-    vreg_set_voltage(oc->voltage);
+    vreg_set_voltage((vreg_voltage)oc->voltage);
     sleep_ms(1);
 
     // set QMI flash timings
