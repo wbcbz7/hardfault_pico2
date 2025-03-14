@@ -368,6 +368,6 @@ void __scratch_y("") core1_task() {
         core1_beacon = time_us_64() / 1000; // time in ms
 
         // foreground tasks
-        sleep_us(100);      // give some chance for core0 to acquire lock
+        sleep_ms(1);      // give some chance for core0 to acquire lock
     }
 }

@@ -107,7 +107,7 @@ void set_config() {
     if (ocparms.voltage > VREG_VOLTAGE_1_50) printf("WARNING: VOLTAGE > 1.50 V!\n");
 
     // calculate HSTX divisor to match the refresh rate
-    ocparms.hstx_div = roundf((float)ocparms.clk_khz / (5*MODE_PIXEL_CLOCK/KHZ));
+    ocparms.hstx_div = ((float)ocparms.clk_khz / (5*MODE_PIXEL_CLOCK/KHZ));
     uint32_t hstx_clk = ocparms.clk_khz / ocparms.hstx_div;
     printf("HSTX divisor = %d, HSTX clock = %d.%02d MHz\n", 
         ocparms.hstx_div, hstx_clk / 1000, (hstx_clk % 1000) / 10
