@@ -53,6 +53,7 @@ add_executable(dh2025w_demo
         misc/timer.cpp
         misc/kucha.cpp
         misc/tprintf.cpp
+        misc/overclock.c
 
         parts/test3d.cpp
         parts/linetunnel.cpp
@@ -60,6 +61,8 @@ add_executable(dh2025w_demo
         parts/tunnel.cpp
         parts/bgmap.cpp
         parts/bgmap_a.S
+
+        stdio_async_uart/stdio_async_uart.c
 )
 
 add_compile_definitions(PICO_XOSC_STARTUP_DELAY_MULTIPLIER=64)
@@ -74,11 +77,12 @@ target_include_directories(dh2025w_demo PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/images
         ${CMAKE_CURRENT_LIST_DIR}/parts
         ${CMAKE_CURRENT_LIST_DIR}/misc
+        ${CMAKE_CURRENT_LIST_DIR}/stdio_async_uart/include
 )
 
 target_compile_options(dh2025w_demo PUBLIC -ffast-math -funsafe-math-optimizations)
 
-pico_enable_stdio_uart(dh2025w_demo 1)
+pico_enable_stdio_uart(dh2025w_demo 0)
 pico_enable_stdio_usb(dh2025w_demo 1)
 
 # pull in common dependencies

@@ -16,6 +16,7 @@
 #include <kucha.h>
 #include <lxmplay.h>
 #include <tprintf.h>
+#include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "hardware/pll.h"
 
@@ -237,7 +238,9 @@ void test3d_run()
     uint32_t pll_sys_prim = pll_sys->prim;
     printf("CLK_SYS CTRL=%08X DIV=%08X | QMI_M0_TIMING=%08X\n", clk_sys_ctrl, clk_sys_div, qmi_m0_timing);
     printf("PLLSYS CS=%08X FBDIV=%08X PRIM=%08X\n", pll_sys_cs, pll_sys_fbdiv, pll_sys_prim);
-    printf("CLKHSTX CTRL=%08X DIV=%08X", clk_hstx_ctrl, clk_hstx_div);;
+    printf("CLKHSTX CTRL=%08X DIV=%08X\n", clk_hstx_ctrl, clk_hstx_div);;
+
+    bool    core1_hang = false;
 
     while(true) {
        
@@ -473,7 +476,14 @@ void test3d_run()
         tprintf(0, Y_RES-8,  "CLKSYS  CTRL=%08X DIV=%08X | QMI_M0_TIMING=%08X", clk_sys_ctrl, clk_sys_div, qmi_m0_timing);
         tprintf(0, Y_RES-16, "CLKHSTX CTRL=%08X DIV=%08X", clk_hstx_ctrl, clk_hstx_div);
 
-        gpio_put(PICO_DEFAULT_LED_PIN, (frame_counter & 32));
+        // check beacon
+        if (abs(((int64_t)time_us_64()/1000) - (int64_t)core1_beacon) > 500) {
+            if (core1_hang == false) printf("FATAL: core1 crashed!\n");
+            core1_hang = true;
+        }
+
+        gpio_put(PICO_DEFAULT_LED_PIN, (frame_counter & 64) | core1_hang);
+        if ((frame_counter & 2048) == 0) {printf("%d\n", frame_counter);}
         // draw "rasterbar"
         //rasterdot(argb_to_555(255, 255, 255));
         dvi_set_framebuffer(&fb[fbIdx], true); fbIdx ^= 1;

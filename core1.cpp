@@ -316,6 +316,9 @@ int audio_init() {
     return 0;
 }
 
+// core1 beacon
+uint32_t core1_beacon;
+
 // ------------------------------------------
 // core 1 task
 void __scratch_y("") core1_task() {
@@ -360,7 +363,11 @@ void __scratch_y("") core1_task() {
         }
         queue_add_blocking(&multicore_queue_resp, &resp);
 #endif
+
+        // post beacon
+        core1_beacon = time_us_64() / 1000; // time in ms
+
         // foreground tasks
-        //sleep_us(100);      // give some chance for core0 to acquire lock
+        sleep_us(100);      // give some chance for core0 to acquire lock
     }
 }

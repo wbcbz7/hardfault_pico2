@@ -14,7 +14,7 @@
 //#define TEXTURES_FROM_FLASH
 //#define USE_DEFAULT_SYSTEM_CLOCK
 #define DO_OVERVOLT
-#define OVERVOLT_VOLTAGE VREG_VOLTAGE_1_35
+#define OVERVOLT_VOLTAGE VREG_VOLTAGE_1_40
 
 // clock multiplier
 #ifndef CLK_SYS_MUL
@@ -44,3 +44,6 @@
 // frame buffer
 extern uint16_t fb[2][X_RES * Y_RES];
 extern uint8_t  fbIdx;
+
+// core 1 "beacon"
+extern uint32_t core1_beacon;

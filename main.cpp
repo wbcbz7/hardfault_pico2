@@ -21,6 +21,7 @@
 #include "defs.h"
 #include "core1.h"
 
+#include <stdio_async_uart.h>
 #include "textures/endpic.h"
 
 // parts include
@@ -30,6 +31,7 @@
 #include "parts/tunnel.h"
 #include "parts/bgmap.h"
 
+#include <overclock.h>
 #include <fbstuff.h>
 #include <argb.h>
 #include <timer.h>
@@ -65,6 +67,18 @@ uint32_t queue_get_resp(uint32_t timeout_us) {
 }
 
 // ----------------------------------------------------------------------------
+
+// default overclocking parameters
+struct overclock_params_t ocparms = {
+    .clk_khz = (MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000,
+    .flash = {
+        .clkdiv  = 3,
+        .rxdelay = 2
+    },
+    .hstx_div = CLK_SYS_MUL
+};
+
+// ----------------------------------------------------------------------------
 // Main program
 
 int main(void) {
@@ -74,6 +88,7 @@ int main(void) {
 
     // init stdio
     stdio_init_all();
+    stdio_async_uart_init_full(uart0, 115200, PICO_DEFAULT_UART_TX_PIN, PICO_DEFAULT_UART_RX_PIN);
     printf("-------------------------------\n");
     
 #ifdef DO_OVERVOLT
@@ -84,7 +99,7 @@ int main(void) {
 #endif
 
 #ifndef USE_DEFAULT_SYSTEM_CLOCK
-    printf("target sysclk = %d kHz\n", (MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000);
+    printf("target sysclk = %d kHz\n", (MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000); fflush(stdout);
     // configure PLL for required pixel clock
     if (!set_sys_clock_khz((MODE_PIXEL_CLOCK*5*CLK_SYS_MUL)/1000, false)) {
         printf("fatal: unable to configure sysclk!\n");
@@ -96,6 +111,8 @@ int main(void) {
 
     // reinit stdio
     stdio_init_all();
+    stdio_async_uart_init_full(uart0, 115200, PICO_DEFAULT_UART_TX_PIN, PICO_DEFAULT_UART_RX_PIN);
+    
     printf("sysclk switch success\n");
 
     // reset core1 and wait a moment to prevent issues after flashing
@@ -179,17 +196,6 @@ int main(void) {
     test3d_run();
     test3d_done();
 #endif
-    {
-        dvi_wait_for_vblank();
-        fb_fill_a(fb[fbIdx], argb_to_555(255, 255, 255), X_RES*Y_RES);
-        dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
-        dvi_wait_for_vblank();
-        dvi_wait_for_vblank();
-        // TODO: end picture
-        memcpy(fb[fbIdx], endpic, sizeof(endpic));
-        //fb_fill_a(fb[fbIdx], argb_to_555(0, 0, 0), X_RES*Y_RES);
-        dvi_set_framebuffer(&fb[fbIdx], 0); fbIdx ^= 1;
-    }
     printf("end of demo. :p\n");
     blink_led_hang();
 }
